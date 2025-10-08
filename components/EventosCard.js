@@ -1,20 +1,20 @@
 import React from 'react';
 
-    import { View, Text, StyleSheet } from 'react-native'; // <--- Importe View, Text, StyleSheet
+    import { View, Text, StyleSheet } from 'react-native';
 
 
 
-    // <--- O componente recebe 'props'
+  
 
-    const PontoTuristicoCard = (props) => {
+    const EventosCard = (props) => {
 
       return (
 
         <View style={styles.card}>
 
-          <Text style={styles.titulo}>{props.nome}</Text> {/* <--- Acessando props.nome */}
+          <Text style={styles.titulo}>{props.nome}</Text> 
 
-          <Text style={styles.descricao}>{props.descricao}</Text> {/* <--- Acessando props.descricao */}
+          <Text style={styles.descricao}>{props.descricao}</Text> 
 
         </View>
 
@@ -27,45 +27,34 @@ import React from 'react';
     const styles = StyleSheet.create({
 
       card: {
-
-        backgroundColor: '#fff',
-
+        backgroundColor: '#D9C8FF',
         padding: 15,
-
         marginVertical: 10,
-
-        marginHorizontal: 20,
-
-        borderRadius: 8,
-
+        borderRadius: 14,
         shadowColor: '#000',
-
         shadowOffset: { width: 0, height: 2 },
-
         shadowOpacity: 0.1,
-
         shadowRadius: 3.84,
-
         elevation: 5, // Sombra para Android
-
+        alignSelf: 'center',
+        width: '90%',
+        maxWidth: 400,
       },
 
       titulo: {
 
         fontSize: 20,
-
         fontWeight: 'bold',
-
         marginBottom: 5,
-
-        color: '#333',
+        color: '#7B2FFF',
+        textAlign: 'center',
 
       },
 
       descricao: {
 
         fontSize: 14,
-
+        textAlign:'center',
         color: '#666',
 
       },
@@ -74,4 +63,4 @@ import React from 'react';
 
 
 
-    export default PontoTuristicoCard; // <--- Exporte o componente
+    export default EventosCard;
