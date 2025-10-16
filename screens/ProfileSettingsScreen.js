@@ -13,12 +13,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile, updateUserProfile, deleteAccount } from '../services/databaseService';
-import { logoutUser, updateUserProfile as updateAuthProfile } from '../services/authService';
+import { updateUserProfile as updateAuthProfile, updateUserEmail } from '../services/authService';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 
 const ProfileSettingsScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const { theme, colors, toggleTheme } = useTheme();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,6 +52,9 @@ const ProfileSettingsScreen = ({ navigation }) => {
           setEditName(userProfile.nome || '');
           setEditEmail(userProfile.email || '');
           setEditPhoto(userProfile.fotoPerfil || '');
+          if (typeof userProfile.notifications === 'boolean') setNotifications(userProfile.notifications);
+          if (typeof userProfile.darkMode === 'boolean') setDarkMode(userProfile.darkMode);
+          if (typeof userProfile.locationServices === 'boolean') setLocationServices(userProfile.locationServices);
         }
       }
     } catch (error) {
@@ -65,12 +73,24 @@ const ProfileSettingsScreen = ({ navigation }) => {
         nome: editName,
         email: editEmail,
         fotoPerfil: editPhoto,
+        notifications,
+        darkMode,
+        locationServices,
       };
 
       await updateUserProfile(user.uid, updates);
-      
-      if (editName !== user.displayName) {
-        await updateAuthProfile({ displayName: editName });
+
+      if (editName && editName !== user.displayName) {
+        await updateAuthProfile({ displayName: editName, photoURL: editPhoto || undefined });
+      } else if (editPhoto) {
+        await updateAuthProfile({ photoURL: editPhoto });
+      }
+
+      if (editEmail && editEmail !== user.email) {
+        const emailResult = await updateUserEmail(editEmail);
+        if (!emailResult.success) {
+          Alert.alert('Aviso', emailResult.error);
+        }
       }
 
       await loadProfile();
@@ -82,6 +102,96 @@ const ProfileSettingsScreen = ({ navigation }) => {
       Alert.alert('Erro', 'Erro ao salvar perfil');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleNotifications = async (value) => {
+    try {
+      setNotifications(value);
+      if (value) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') {
+          setNotifications(false);
+          Alert.alert('Permissão necessária', 'Ative as permissões de notificações nas configurações.');
+          return;
+        }
+        try {
+          const tokenData = await Notifications.getExpoPushTokenAsync();
+          const expoPushToken = tokenData?.data;
+          if (expoPushToken && user?.uid) {
+            await updateUserProfile(user.uid, { expoPushToken, notifications: true });
+          }
+        } catch (e) {
+          // Token pode falhar no simulador/web
+          console.log('Não foi possível obter token de push:', e?.message);
+        }
+      } else if (user?.uid) {
+        await updateUserProfile(user.uid, { notifications: false });
+      }
+    } catch (error) {
+      console.error('Erro ao alternar notificações:', error);
+    }
+  };
+
+  const handleToggleLocation = async (value) => {
+    try {
+      setLocationServices(value);
+      if (value) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationServices(false);
+          Alert.alert('Permissão necessária', 'Ative as permissões de localização nas configurações.');
+          return;
+        }
+        try {
+          const position = await Location.getCurrentPositionAsync({});
+          if (user?.uid) {
+            await updateUserProfile(user.uid, {
+              locationServices: true,
+              lastKnownLocation: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                timestamp: position.timestamp,
+              }
+            });
+          }
+        } catch (e) {
+          console.log('Não foi possível obter localização:', e?.message);
+        }
+      } else if (user?.uid) {
+        await updateUserProfile(user.uid, { locationServices: false });
+      }
+    } catch (error) {
+      console.error('Erro ao alternar localização:', error);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Permita acesso às fotos para trocar a imagem de perfil.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.length) {
+        const localUri = result.assets[0].uri;
+        setEditPhoto(localUri);
+        setShowEditModal(true);
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
     }
   };
 
@@ -157,73 +267,73 @@ const ProfileSettingsScreen = ({ navigation }) => {
       </View>
 
       {/* Perfil do usuário */}
-      <View style={styles.profileSection}>
+      <View style={[styles.profileSection, darkMode && { backgroundColor: '#111827' }]}>
         <View style={styles.avatarContainer}>
           {profile?.fotoPerfil ? (
             <Image source={{ uri: profile.fotoPerfil }} style={styles.avatar} />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={40} color="#8B5CF6" />
+            <View style={[styles.avatarPlaceholder, darkMode && { backgroundColor: '#1F2937', borderColor: '#374151' }]}>
+              <Ionicons name="person" size={40} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
             </View>
           )}
           <TouchableOpacity 
             style={styles.editAvatarButton}
-            onPress={() => setShowEditModal(true)}
+            onPress={handlePickImage}
           >
             <Ionicons name="camera" size={16} color="white" />
           </TouchableOpacity>
         </View>
         
-        <Text style={styles.userName}>{profile?.nome || 'Usuário'}</Text>
-        <Text style={styles.userEmail}>{profile?.email || user?.email}</Text>
+        <Text style={[styles.userName, darkMode && { color: 'white' }]}>{profile?.nome || 'Usuário'}</Text>
+        <Text style={[styles.userEmail, darkMode && { color: '#9CA3AF' }]}>{profile?.email || user?.email}</Text>
         
         <TouchableOpacity 
-          style={styles.editButton}
+          style={[styles.editButton, darkMode && { backgroundColor: '#111827', borderColor: '#374151' }]}
           onPress={() => setShowEditModal(true)}
         >
-          <Ionicons name="create-outline" size={16} color="#8B5CF6" />
-          <Text style={styles.editButtonText}>Editar Perfil</Text>
+          <Ionicons name="create-outline" size={16} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+          <Text style={[styles.editButtonText, darkMode && { color: '#A78BFA' }]}>Editar Perfil</Text>
         </TouchableOpacity>
       </View>
 
       {/* Configurações */}
-      <View style={styles.settingsSection}>
-        <Text style={styles.sectionTitle}>Configurações</Text>
+      <View style={[styles.settingsSection, darkMode && { backgroundColor: '#111827' }]}>
+        <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Configurações</Text>
         
-        <View style={styles.settingItem}>
+        <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
           <View style={styles.settingInfo}>
-            <Ionicons name="notifications-outline" size={24} color="#8B5CF6" />
-            <Text style={styles.settingLabel}>Notificações</Text>
+            <Ionicons name="notifications-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+            <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Notificações</Text>
           </View>
           <Switch
             value={notifications}
-            onValueChange={setNotifications}
+            onValueChange={handleToggleNotifications}
             trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
             thumbColor={notifications ? '#8B5CF6' : '#9CA3AF'}
           />
         </View>
 
-        <View style={styles.settingItem}>
+        <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
           <View style={styles.settingInfo}>
-            <Ionicons name="moon-outline" size={24} color="#8B5CF6" />
-            <Text style={styles.settingLabel}>Modo Escuro</Text>
+            <Ionicons name="moon-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+            <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Modo Escuro</Text>
           </View>
           <Switch
             value={darkMode}
-            onValueChange={setDarkMode}
+            onValueChange={(val) => { setDarkMode(val); toggleTheme(); }}
             trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
             thumbColor={darkMode ? '#8B5CF6' : '#9CA3AF'}
           />
         </View>
 
-        <View style={styles.settingItem}>
+        <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
           <View style={styles.settingInfo}>
-            <Ionicons name="location-outline" size={24} color="#8B5CF6" />
-            <Text style={styles.settingLabel}>Serviços de Localização</Text>
+            <Ionicons name="location-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+            <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Serviços de Localização</Text>
           </View>
           <Switch
             value={locationServices}
-            onValueChange={setLocationServices}
+            onValueChange={handleToggleLocation}
             trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
             thumbColor={locationServices ? '#8B5CF6' : '#9CA3AF'}
           />
@@ -231,8 +341,8 @@ const ProfileSettingsScreen = ({ navigation }) => {
       </View>
 
       {/* Ações */}
-      <View style={styles.actionsSection}>
-        <Text style={styles.sectionTitle}>Ações</Text>
+      <View style={[styles.actionsSection, darkMode && { backgroundColor: '#111827' }]}>
+        <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Ações</Text>
         
         <TouchableOpacity 
           style={styles.actionButton}
@@ -292,14 +402,14 @@ const ProfileSettingsScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Foto de Perfil (URL)</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editPhoto}
-                onChangeText={setEditPhoto}
-                placeholder="https://exemplo.com/foto.jpg"
-                autoCapitalize="none"
-              />
+              <Text style={styles.inputLabel}>Foto de Perfil</Text>
+              {!!editPhoto && (
+                <Image source={{ uri: editPhoto }} style={{ width: 120, height: 120, borderRadius: 60, marginBottom: 10 }} />
+              )}
+              <TouchableOpacity style={[styles.editButton, { marginTop: 10 }]} onPress={handlePickImage}>
+                <Ionicons name="image-outline" size={16} color="#8B5CF6" />
+                <Text style={styles.editButtonText}>Selecionar da Galeria</Text>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>

@@ -45,34 +45,18 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleEventosProximos = () => {
-    const eventCount = Object.keys(events).length;
-    const eventList = Object.values(events).map(event => `• ${event.nome} - ${event.local}`).join('\n');
-    
-    Alert.alert(
-      'Eventos próximos', 
-      `Encontramos ${eventCount} eventos disponíveis:\n\n${eventList || 'Nenhum evento encontrado.'}`
-    );
+    navigation.navigate('NearbyEvents');
   };
 
   const handleCriarEvento = () => {
     if (checkLoginRequired('criar um evento')) {
-      Alert.alert('Criar evento', 'Funcionalidade de criar evento em desenvolvimento!');
+      navigation.navigate('CreateEvent');
     }
   };
 
   const handleSeusEventos = () => {
     if (checkLoginRequired('ver seus eventos')) {
-      const userEvents = Object.values(events).filter(event => 
-        event.criadoPor === user?.uid || 
-        event.participantes?.includes(user?.uid)
-      );
-      
-      const eventList = userEvents.map(event => `• ${event.nome} - ${event.local}`).join('\n');
-      
-      Alert.alert(
-        'Seus eventos', 
-        `Você tem ${userEvents.length} eventos:\n\n${eventList || 'Nenhum evento encontrado.'}`
-      );
+      navigation.navigate('MyEvents');
     }
   };
 

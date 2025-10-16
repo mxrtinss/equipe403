@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChange, getCurrentUser } from '../services/authService';
+import { onAuthStateChange, getCurrentUser, logoutUser } from '../services/authService';
 
 const AuthContext = createContext({});
 
@@ -38,6 +38,15 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  const logout = async () => {
+    try {
+      await logoutUser();
+      setUser(null);
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -45,6 +54,7 @@ export const AuthProvider = ({ children }) => {
     userEmail: user?.email || null,
     userName: user?.displayName || null,
     userId: user?.uid || null,
+    logout,
   };
 
   return (

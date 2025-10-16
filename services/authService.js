@@ -1,5 +1,5 @@
 import { FIREBASE_AUTH } from '../config/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, onAuthStateChanged, updateProfile, updateEmail } from 'firebase/auth';
 
 export const loginUser = async (email, password) => {
   try {
@@ -196,5 +196,29 @@ export const updateUserProfile = async (updates) => {
       success: false,
       error: 'Erro ao atualizar perfil.'
     };
+  }
+};
+
+export const updateUserEmail = async (newEmail) => {
+  try {
+    const user = getCurrentUser();
+    if (!user) {
+      return { success: false, error: 'Usuário não está logado.' };
+    }
+    await updateEmail(user, newEmail);
+    return { success: true, user, message: 'Email atualizado com sucesso!' };
+  } catch (error) {
+    let message = 'Erro ao atualizar email.';
+    switch (error.code) {
+      case 'auth/invalid-email':
+        message = 'Email inválido.'; break;
+      case 'auth/email-already-in-use':
+        message = 'Este email já está em uso.'; break;
+      case 'auth/requires-recent-login':
+        message = 'Por segurança, faça login novamente para alterar o email.'; break;
+      default:
+        message = error.message || message;
+    }
+    return { success: false, error: message };
   }
 };
