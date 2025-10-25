@@ -105,7 +105,7 @@ const NearbyEventsScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 45, borderBottomWidth: 1 },
   backButton: { padding: 8 },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   placeholder: { width: 40 },
