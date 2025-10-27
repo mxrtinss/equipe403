@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert, FlatList, Dimensions } from "react-native";
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CAROUSEL_WIDTH = Dimensions.get('window').width;
+const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.55);
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { logoutUser } from '../services/authService';
@@ -33,6 +37,41 @@ const HomeScreen = ({ navigation }) => {
 
     loadData();
   }, []);
+
+  // Array de imagens locais para o carrossel (mais rápido e funciona offline)
+  const CAROUSEL_IMAGES = [
+    { 
+      id: '1',
+      source: require('../assets/evento1.jpg')  
+    },
+    {
+      id: '2',
+      source: require('../assets/evento2.jpg')  
+    },
+    {
+      id: '3',
+      source: require('../assets/evento3.jpg')  
+    }
+  ];
+
+  const flatListRef = useRef(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  useEffect(() => {
+    if (!CAROUSEL_IMAGES || CAROUSEL_IMAGES.length <= 1) return;
+    const interval = setInterval(() => {
+      const next = (carouselIndex + 1) % CAROUSEL_IMAGES.length;
+      setCarouselIndex(next);
+      if (flatListRef.current) {
+        try {
+          flatListRef.current.scrollToIndex({ index: next, animated: true });
+        } catch (e) {
+          // ignore scroll errors
+        }
+      }
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [carouselIndex]);
 
   const checkLoginRequired = (actionName) => {
     if (!isLoggedIn) {
@@ -109,6 +148,31 @@ const HomeScreen = ({ navigation }) => {
 
           <Image source={require('../assets/logo.png')} style={styles.logo} />
           <Text style={styles.subTitle}>O guia de eventos perfeito para você!</Text>
+
+          {/* Carousel de imagens usando assets locais */}
+          <View style={styles.carouselWrap}>
+            <FlatList
+              ref={flatListRef}
+              data={CAROUSEL_IMAGES}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <Image
+                  source={item.source}
+                  style={styles.carouselImage}
+                  resizeMode="cover"
+                />
+              )}
+              onMomentumScrollEnd={(ev) => {
+                const width = ev.nativeEvent.layoutMeasurement.width;
+                const index = Math.round(ev.nativeEvent.contentOffset.x / width);
+                setCarouselIndex(index);
+              }}
+              getItemLayout={(data, index) => ({ length: CAROUSEL_WIDTH, offset: CAROUSEL_WIDTH * index, index })}
+            />
+          </View>
 
           <EventosCard
             nome="Eventos próximos"
@@ -232,6 +296,18 @@ const styles = StyleSheet.create({
     width: 35,
     height: 35,
     marginBottom: 2,
+  },
+  carouselWrap: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  carouselImage: {
+    width: CAROUSEL_WIDTH,
+    height: CAROUSEL_HEIGHT,
+    borderRadius: 12,
+    marginHorizontal: 8,
+    backgroundColor: '#e1e1e1',
   },
 });
 
