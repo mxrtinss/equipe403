@@ -42,15 +42,15 @@ const HomeScreen = ({ navigation }) => {
   const CAROUSEL_IMAGES = [
     { 
       id: '1',
-      source: require('../assets/evento1.jpg')  // Imagem da logo do app
+      source: require('../assets/evento1.jpg')  
     },
     {
       id: '2',
-      source: require('../assets/evento2.jpg')  // Ícone do app
+      source: require('../assets/evento2.jpg')  
     },
     {
       id: '3',
-      source: require('../assets/evento3.jpg')  // Splash screen
+      source: require('../assets/evento3.jpg')  
     }
   ];
 
