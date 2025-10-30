@@ -6,33 +6,35 @@ import Constants from 'expo-constants';
 import { useTheme } from '../contexts/ThemeContext';
 import { getEventsNearby as getEventsNearbyDb } from '../services/firebaseConfig';
 
-const kmDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};
-
+// Componente principal da tela de eventos próximos
 const NearbyEventsScreen = ({ navigation }) => {
+  // Hook para acessar cores e tema do contexto
   const { colors, theme } = useTheme();
+  // Estado para controlar o carregamento da tela
   const [loading, setLoading] = useState(true);
+  // Estado para armazenar as coordenadas do usuário
   const [coords, setCoords] = useState(null);
+  // Estado para armazenar a lista de eventos
   const [events, setEvents] = useState([]);
 
+  // Hook para solicitar e obter a localização do usuário quando a tela é carregada
   useEffect(() => {
     (async () => {
       try {
+        // Solicita permissão para acessar a localização
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
+          // Se a permissão for negada, mostra um alerta
           Alert.alert('Permissão', 'Precisamos da sua localização para buscar eventos próximos.');
           setLoading(false);
           return;
         }
+        // Obtém a posição atual do usuário
         const loc = await Location.getCurrentPositionAsync({});
+        // Armazena as coordenadas no estado
         setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       } catch (e) {
+        // Em caso de erro, mostra um alerta
         Alert.alert('Erro', 'Não foi possível obter localização.');
         setLoading(false);
       }
@@ -81,6 +83,7 @@ const NearbyEventsScreen = ({ navigation }) => {
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => {
           const dist = item.latitude && item.longitude ? kmDistance(coords.latitude, coords.longitude, item.latitude, item.longitude) : null;
+
           return (
             <View style={[styles.card, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderColor: colors.border }]}> 
               {item.image ? <Image source={{ uri: item.image }} style={styles.cardImage} /> : null}
