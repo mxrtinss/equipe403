@@ -5,7 +5,7 @@ import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert, Fla
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CAROUSEL_WIDTH = Dimensions.get('window').width;
 const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.55);
-import { Ionicons } from '@expo/vector-icons';
+// Ionicons removed because login button was removed from header
 import { useAuth } from '../contexts/AuthContext';
 import { logoutUser } from '../services/authService';
 import { getAllEvents, getAllUsers } from '../services/databaseService';
@@ -106,44 +106,6 @@ const HomeScreen = ({ navigation }) => {
           {/* Header com botão de login */}
           <View style={styles.header}>
             <View style={styles.headerLeft} />
-            <Text style={styles.headerTitle}>festei!</Text>
-            <TouchableOpacity 
-              style={[styles.loginButton, isLoggedIn && styles.loggedInButton]}
-              onPress={async () => {
-                if (isLoggedIn) {
-                  Alert.alert(
-                    'Logout',
-                    'Deseja sair da sua conta?',
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      { 
-                        text: 'Sair', 
-                        onPress: async () => {
-                          try {
-                            const result = await logoutUser();
-                            if (result.success) {
-                              Alert.alert('Sucesso', result.message);
-                            } else {
-                              Alert.alert('Erro', result.error);
-                            }
-                          } catch (error) {
-                            Alert.alert('Erro', 'Erro ao fazer logout.');
-                          }
-                        }
-                      }
-                    ]
-                  );
-                } else {
-                  navigation.navigate('Login');
-                }
-              }}
-            >
-              <Ionicons 
-                name={isLoggedIn ? "person" : "person-outline"} 
-                size={24} 
-                color={isLoggedIn ? "white" : "#8B5CF6"} 
-              />
-            </TouchableOpacity>
           </View>
 
           <Image source={require('../assets/logo.png')} style={styles.logo} />
@@ -223,12 +185,13 @@ const HomeScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   scrollViewContainer: {
-    paddingBottom: 245, 
+    // reduzido para evitar grande espaço em branco ao final da página
+    paddingBottom: 80,
     backgroundColor: '#f5f5f5',
   },
   container: {
     backgroundColor: '#f5f5f5',
-    paddingTop: 20,
+    paddingTop: 50,
     alignItems: 'center',
   },
   header: {
@@ -237,7 +200,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   headerLeft: {
     width: 40,
