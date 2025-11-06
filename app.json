@@ -14,8 +14,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localizaÃ§Ã£o para melhorar sua experiÃªncia.",
-        "NSPhotoLibraryUsageDescription": "Precisamos de acesso Ã  sua galeria para escolher foto de perfil."
+        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para encontrar eventos próximos a você.",
+        "NSLocationAlwaysUsageDescription": "Precisamos da sua localização para encontrar eventos próximos a você.",
+        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria para escolher foto de perfil."
       }
     },
     "android": {
@@ -25,11 +26,22 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "POST_NOTIFICATIONS",
-        "READ_EXTERNAL_STORAGE"
-      ]
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.app_igor"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,7 +54,10 @@
         "expo-notifications"
       ],
       [
-        "expo-location"
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que o app use sua localização para encontrar eventos próximos a você."
+        }
       ],
       [
         "expo-image-picker"
