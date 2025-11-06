@@ -22,5 +22,9 @@
     "react-native-gesture-handler": "~2.28.0",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0"
+  },
+  "scripts": {
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   }
 }
