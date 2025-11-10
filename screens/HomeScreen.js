@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert, FlatList, Dimensions } from "react-native";
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CAROUSEL_WIDTH = Dimensions.get('window').width;
-const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.55);
+const CAROUSEL_WIDTH = SCREEN_WIDTH;
+// aumentar a proporção para deixar as imagens mais proeminentes
+const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.68);
+const BUTTON_CAROUSEL_WIDTH = SCREEN_WIDTH; // Largura total da tela para os botões
 // Ionicons removed because login button was removed from header
 import { useAuth } from '../contexts/AuthContext';
 import { logoutUser } from '../services/authService';
@@ -56,6 +59,9 @@ const HomeScreen = ({ navigation }) => {
 
   const flatListRef = useRef(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [buttonCarouselIndex, setButtonCarouselIndex] = useState(0);
+  const buttonsFlatListRef = useRef(null);
+  
 
   useEffect(() => {
     if (!CAROUSEL_IMAGES || CAROUSEL_IMAGES.length <= 1) return;
@@ -99,6 +105,25 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  // lista reutilizável dos botões principais (usada também para checar ultimo/primeiro indice)
+  const BUTTONS = [
+    {
+      id: '1',
+      nome: "Eventos próximos",
+      descricao: "Descubra os próximos eventos que acontecerão pertinho de você!",
+    },
+    {
+      id: '2',
+      nome: "Criar um evento",
+      descricao: "Crie e organize eventos, faça as memórias acontecerem!",
+    },
+    {
+      id: '3',
+      nome: "Seus eventos",
+      descricao: "Aqui você consulta aqueles eventos que já viraram memórias e aqueles que você quer ir!",
+    },
+  ];
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
@@ -110,6 +135,70 @@ const HomeScreen = ({ navigation }) => {
 
           <Image source={require('../assets/logo.png')} style={styles.logo} />
           <Text style={styles.subTitle}>O guia de eventos perfeito para você!</Text>
+
+          {/* Carrossel de botões principais */}
+          <View style={styles.buttonsCarouselContainer}>
+            <TouchableOpacity
+              disabled={buttonCarouselIndex === 0}
+              style={[
+                styles.carouselArrow,
+                buttonCarouselIndex === 0 && styles.carouselArrowDisabled,
+              ]}
+              onPress={() => {
+                if (buttonCarouselIndex === 0) return;
+                if (buttonsFlatListRef.current) {
+                  buttonsFlatListRef.current.scrollToOffset({
+                    offset: Math.max(0, (buttonCarouselIndex - 1) * BUTTON_CAROUSEL_WIDTH),
+                    animated: true,
+                  });
+                }
+              }}
+            >
+              <Ionicons name="chevron-back" size={24} color={buttonCarouselIndex === 0 ? '#C7C7CC' : '#8B5CF6'} />
+            </TouchableOpacity>
+
+            <FlatList
+              ref={buttonsFlatListRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              pagingEnabled
+              onMomentumScrollEnd={(ev) => {
+                const newIndex = Math.round(ev.nativeEvent.contentOffset.x / BUTTON_CAROUSEL_WIDTH);
+                setButtonCarouselIndex(newIndex);
+              }}
+              data={BUTTONS}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.buttonCardContainer}>
+                  <EventosCard
+                    nome={item.nome}
+                    descricao={item.descricao}
+                    onPress={item.id === '1' ? handleEventosProximos : item.id === '2' ? handleCriarEvento : handleSeusEventos}
+                  />
+                </View>
+              )}
+            />
+
+            <TouchableOpacity
+              disabled={buttonCarouselIndex >= BUTTONS.length - 1}
+              style={[
+                styles.carouselArrow,
+                styles.carouselArrowRight,
+                buttonCarouselIndex >= BUTTONS.length - 1 && styles.carouselArrowDisabled,
+              ]}
+              onPress={() => {
+                if (buttonCarouselIndex >= BUTTONS.length - 1) return;
+                if (buttonsFlatListRef.current) {
+                  buttonsFlatListRef.current.scrollToOffset({
+                    offset: (buttonCarouselIndex + 1) * BUTTON_CAROUSEL_WIDTH,
+                    animated: true,
+                  });
+                }
+              }}
+            >
+              <Ionicons name="chevron-forward" size={24} color={buttonCarouselIndex >= BUTTONS.length - 1 ? '#C7C7CC' : '#8B5CF6'} />
+            </TouchableOpacity>
+          </View>
 
           {/* Carousel de imagens usando assets locais */}
           <View style={styles.carouselWrap}>
@@ -135,22 +224,6 @@ const HomeScreen = ({ navigation }) => {
               getItemLayout={(data, index) => ({ length: CAROUSEL_WIDTH, offset: CAROUSEL_WIDTH * index, index })}
             />
           </View>
-
-          <EventosCard
-            nome="Eventos próximos"
-            descricao="Descubra os próximos eventos que acontecerão pertinho de você!"
-            onPress={handleEventosProximos}
-          />
-          <EventosCard
-            nome="Criar um evento"
-            descricao="Crie e organize eventos, faça as memórias acontecerem!"
-            onPress={handleCriarEvento}
-          />
-          <EventosCard
-            nome="Seus eventos"
-            descricao="Aqui você consulta aqueles eventos que já viraram memórias e aqueles que você quer ir!"
-            onPress={handleSeusEventos}
-          />
 
           <StatusBar style="auto" />
         </View>
@@ -185,14 +258,42 @@ const HomeScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   scrollViewContainer: {
-    // reduzido para evitar grande espaço em branco ao final da página
     paddingBottom: 80,
     backgroundColor: '#f5f5f5',
   },
   container: {
     backgroundColor: '#f5f5f5',
-    paddingTop: 50,
+    paddingTop: 40,
     alignItems: 'center',
+  },
+  buttonsCarouselContainer: {
+    width: SCREEN_WIDTH,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonCardContainer: {
+    width: BUTTON_CAROUSEL_WIDTH,
+    paddingHorizontal: 56, // deixa espaço das setas nas laterais
+  },
+  carouselArrow: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 20,
+    position: 'absolute',
+    zIndex: 1,
+    left: 10,
+  },
+  carouselArrowDisabled: {
+    backgroundColor: 'rgba(200,200,200,0.6)',
+  },
+  carouselArrowRight: {
+    left: undefined,
+    right: 10,
   },
   header: {
     flexDirection: 'row',
@@ -263,14 +364,23 @@ const styles = StyleSheet.create({
   carouselWrap: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 16,
+    // aumentar o espaçamento entre os botões e o carrossel de imagens
+    marginTop: 36,
+    marginBottom: 20,
   },
   carouselImage: {
-    width: CAROUSEL_WIDTH,
+    // imagens mais largas e com menos margem lateral para dar destaque
+    width: CAROUSEL_WIDTH - 24,
     height: CAROUSEL_HEIGHT,
     borderRadius: 12,
-    marginHorizontal: 8,
+    marginHorizontal: 12,
     backgroundColor: '#e1e1e1',
+    // sombra para destacar as imagens
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
 
