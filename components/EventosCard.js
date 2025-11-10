@@ -17,20 +17,20 @@ const EventosCard = (props) => {
 
 
     const styles = StyleSheet.create({
-
       card: {
         backgroundColor: '#D9C8FF',
-        padding: 15,
+        padding: 20,
         marginVertical: 10,
         borderRadius: 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
-        elevation: 5, // Sombra para Android
-        alignSelf: 'center',
-        width: '90%',
+        elevation: 5,
+        width: '100%',
         maxWidth: 400,
+        minHeight: 120,
+        justifyContent: 'center',
       },
 
       titulo: {
