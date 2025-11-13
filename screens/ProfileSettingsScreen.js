@@ -127,7 +127,6 @@ const ProfileSettingsScreen = ({ navigation }) => {
             await updateUserProfile(user.uid, { expoPushToken, notifications: true });
           }
         } catch (e) {
-          // Token pode falhar no simulador/web
           console.log('Não foi possível obter token de push:', e?.message);
         }
       } else if (user?.uid) {

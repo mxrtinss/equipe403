@@ -1,195 +1,177 @@
-// services/eventsApiService.js
-import * as Location from 'expo-location';
+const TICKETMASTER_API_KEY = 'IxtAkQ9VsDLwZ381ls9yaeFivOofsWND';
+const BASE_URL = 'https://app.ticketmaster.com/discovery/v2'; 
 
-const SYMPLA_API_BASE = 'https://api.sympla.com.br/public/v4';
-const SYMPLA_TOKEN = '0aab2a866d1c9219f54dcff7723521a31a8b276da74dbdb04ed6bbd1114f48a7';
-
-/**
- * Obtém a localização atual do usuário
- */
-export const getUserLocation = async () => {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    
-    if (status !== 'granted') {
-      throw new Error('Permissão de localização negada');
-    }
-
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-    };
-  } catch (error) {
-    console.error('Erro ao obter localização:', error);
-    throw error;
-  }
-};
-
-/**
- * Calcula a distância entre dois pontos (em km) usando a fórmula de Haversine
- */
 export const kmDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371; // Raio da Terra em km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const distance = R * c;
-  
-  return distance;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 };
 
 /**
- * Busca eventos do Sympla
+ * @param {number} latitude 
+ * @param {number} longitude 
+ * @param {number} radius 
+ * @returns {Promise<Array>}
  */
-export const getSymplaEvents = async () => {
+export const getNearbyEvents = async (latitude, longitude, radius = 50) => {
   try {
-    const response = await fetch(`${SYMPLA_API_BASE}/events`, {
+    console.log('=== DEBUG TICKETMASTER BRASIL API ===');
+    console.log('Localização:', { latitude, longitude });
+    console.log('Raio:', radius, 'km');
+
+    const url = `${BASE_URL}/events.json?apikey=${TICKETMASTER_API_KEY}&latlong=${latitude},${longitude}&radius=${radius}&unit=km&size=50&sort=date,asc`;
+    
+    console.log('URL da requisição:', url);
+
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        's_token': SYMPLA_TOKEN,
       },
     });
+
+    console.log('Status da resposta:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro Sympla:', response.status, errorText);
-      throw new Error(`Erro na API Sympla: ${response.status}`);
+      console.error('Erro Ticketmaster Brasil:', response.status, errorText);
+      throw new Error(`Erro na API Ticketmaster Brasil: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Eventos Sympla:', data);
-    return data.data || [];
-  } catch (error) {
-    console.error('Erro ao buscar eventos do Sympla:', error);
-    throw error;
-  }
-};
+    console.log('Eventos encontrados:', data._embedded?.events?.length || 0);
 
-/**
- * Formata evento do Sympla para o padrão do app
- */
-const formatSymplaEvent = (event) => {
-  return {
-    id: event.id,
-    title: event.name,
-    name: event.name,
-    date: event.start_date ? new Date(event.start_date).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }) : 'Data não informada',
-    image: event.image || null,
-    latitude: event.address?.lat ? parseFloat(event.address.lat) : null,
-    longitude: event.address?.lng ? parseFloat(event.address.lng) : null,
-    address: event.address?.name || 'Local não informado',
-    city: event.address?.city || '',
-    state: event.address?.state || '',
-    description: event.description || '',
-    url: event.url || '',
-  };
-};
-
-/**
- * Busca eventos próximos à localização do usuário
- */
-export const getNearbyEvents = async (latitude, longitude, radiusKm = 50) => {
-  try {
-    // Busca todos os eventos do Sympla
-    const events = await getSymplaEvents();
-    
-    // Filtra eventos próximos e adiciona distância
-    const nearbyEvents = events
-      .map(event => {
-        const formattedEvent = formatSymplaEvent(event);
-        
-        // Verifica se o evento tem coordenadas
-        if (formattedEvent.latitude && formattedEvent.longitude) {
-          const distance = kmDistance(
-            latitude,
-            longitude,
-            formattedEvent.latitude,
-            formattedEvent.longitude
-          );
-          
-          return {
-            ...formattedEvent,
-            distance: distance,
-          };
-        }
-        return null;
-      })
-      .filter(event => event !== null && event.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance);
-
-    return nearbyEvents;
-  } catch (error) {
-    console.error('Erro ao buscar eventos próximos:', error);
-    throw error;
-  }
-};
-
-/**
- * Busca eventos por cidade/estado (fallback se a API do Sympla suportar)
- */
-export const getEventsByLocation = async (city, state) => {
-  try {
-    const response = await fetch(
-      `${SYMPLA_API_BASE}/events?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          's_token': SYMPLA_TOKEN,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Erro na API Sympla: ${response.status}`);
+    if (!data._embedded || !data._embedded.events) {
+      console.log('Nenhum evento encontrado');
+      return [];
     }
 
-    const data = await response.json();
-    return (data.data || []).map(formatSymplaEvent);
-  } catch (error) {
-    console.error('Erro ao buscar eventos por localização:', error);
-    throw error;
-  }
-};
+    const events = data._embedded.events.map(event => {
+      const image = event.images?.find(img => img.ratio === '16_9' && img.width > 1000)?.url 
+                    || event.images?.[0]?.url 
+                    || null;
 
-/**
- * Busca detalhes de um evento específico
- */
-export const getEventDetails = async (eventId) => {
-  try {
-    const response = await fetch(`${SYMPLA_API_BASE}/events/${eventId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        's_token': SYMPLA_TOKEN,
-      },
+      const venue = event._embedded?.venues?.[0];
+      const eventLatitude = venue?.location?.latitude ? parseFloat(venue.location.latitude) : null;
+      const eventLongitude = venue?.location?.longitude ? parseFloat(venue.location.longitude) : null;
+
+      const distance = (eventLatitude && eventLongitude) 
+        ? kmDistance(latitude, longitude, eventLatitude, eventLongitude)
+        : null;
+
+      const date = event.dates?.start?.localDate || '';
+      const time = event.dates?.start?.localTime || '';
+      const formattedDate = formatDate(date, time);
+
+      return {
+        id: event.id,
+        title: event.name,
+        name: event.name,
+        date: formattedDate,
+        image: image,
+        url: event.url,
+        city: venue?.city?.name || '',
+        state: venue?.state?.stateCode || '',
+        country: venue?.country?.countryCode || 'BR',
+        venueName: venue?.name || '',
+        latitude: eventLatitude,
+        longitude: eventLongitude,
+        distance: distance,
+        priceRange: event.priceRanges?.[0] ? {
+          min: event.priceRanges[0].min,
+          max: event.priceRanges[0].max,
+          currency: event.priceRanges[0].currency
+        } : null,
+        classifications: event.classifications?.[0]?.segment?.name || 'Evento',
+        status: event.dates?.status?.code || 'onsale'
+      };
     });
 
-    if (!response.ok) {
-      throw new Error(`Erro na API Sympla: ${response.status}`);
-    }
+    const sortedEvents = events.sort((a, b) => {
+      if (a.distance === null) return 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
 
+    console.log('Eventos processados:', sortedEvents.length);
+    console.log('================================');
+
+    return sortedEvents;
+  } catch (error) {
+    console.error('Erro ao buscar eventos:', error);
+    throw error;
+  }
+};
+
+const formatDate = (date, time) => {
+  if (!date) return 'Data não disponível';
+
+  try {
+    const [year, month, day] = date.split('-');
+    const dateObj = new Date(year, month - 1, day);
+    
+    const options = { 
+      day: '2-digit', 
+      month: 'long', 
+      year: 'numeric' 
+    };
+    
+    let formatted = dateObj.toLocaleDateString('pt-BR', options);
+    
+    if (time) {
+      formatted += ` às ${time}`;
+    }
+    
+    return formatted;
+  } catch (error) {
+    return date;
+  }
+};
+
+export const getEventDetails = async (eventId) => {
+  try {
+    const url = `${BASE_URL}/events/${eventId}.json?apikey=${TICKETMASTER_API_KEY}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Erro na API: ${response.status}`);
+    }
+    
     const data = await response.json();
-    return formatSymplaEvent(data.data);
+    return data;
   } catch (error) {
     console.error('Erro ao buscar detalhes do evento:', error);
+    throw error;
+  }
+};
+
+export const getEventsByCategory = async (latitude, longitude, category, radius = 50) => {
+  try {
+    const url = `${BASE_URL}/events.json?apikey=${TICKETMASTER_API_KEY}&latlong=${latitude},${longitude}&radius=${radius}&unit=km&classificationName=${category}&size=50`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Erro na API: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data._embedded || !data._embedded.events) {
+      return [];
+    }
+    
+    return data._embedded.events;
+  } catch (error) {
+    console.error('Erro ao buscar eventos por categoria:', error);
     throw error;
   }
 };

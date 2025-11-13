@@ -17,7 +17,7 @@ export const uploadImageAsync = async (uri, path) => {
   return downloadURL;
 };
 
-const kmToLat = (km) => km / 110.574; // approx degrees per km
+const kmToLat = (km) => km / 110.574;
 const kmToLon = (km, latitude) => km / (111.320 * Math.cos(latitude * Math.PI / 180));
 
 export const getEventsNearby = async (lat, lon, radiusKm = 25) => {
@@ -29,14 +29,12 @@ export const getEventsNearby = async (lat, lon, radiusKm = 25) => {
   const filtered = within.filter((e) => {
     const dLat = lat - e.latitude;
     const dLon = lon - e.longitude;
-    // quick bounding box prefilter using ~1 degree ~ 111km
     const approxKm = Math.sqrt((dLat * 111.0) ** 2 + (dLon * 111.0) ** 2);
     return approxKm <= radiusKm;
   });
   return filtered;
 };
 
-// Realtime Database implementations (requested set)
 export const createEvent = async (data) => {
   const newRef = push(dbRef(rtdb, 'events'));
   const payload = { ...data, createdAt: Date.now() };
@@ -81,7 +79,6 @@ export const deleteImageByUrl = async (url) => {
     const ref = storageRef(storage, url);
     await deleteObject(ref);
   } catch (_) {
-    // ignore if not found or invalid
   }
 };
 
