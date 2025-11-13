@@ -16,7 +16,10 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para encontrar eventos próximos a você.",
         "NSLocationAlwaysUsageDescription": "Precisamos da sua localização para encontrar eventos próximos a você.",
-        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria para escolher foto de perfil."
+        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria para escolher foto de perfil.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -25,21 +28,14 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
+      "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.INTERNET"
       ],
       "package": "com.anonymous.app_igor"
     },

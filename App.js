@@ -58,7 +58,6 @@ export default function App() {
           importance: Notifications.AndroidImportance.DEFAULT,
         });
       } catch (e) {
-        // Ignora em plataformas que não suportam canais
       }
     })();
   }, []);

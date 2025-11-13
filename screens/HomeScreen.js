@@ -5,10 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CAROUSEL_WIDTH = SCREEN_WIDTH;
-// aumentar a proporção para deixar as imagens mais proeminentes
 const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.68);
-const BUTTON_CAROUSEL_WIDTH = SCREEN_WIDTH; // Largura total da tela para os botões
-// Ionicons removed because login button was removed from header
+const BUTTON_CAROUSEL_WIDTH = SCREEN_WIDTH;
 import { useAuth } from '../contexts/AuthContext';
 import { logoutUser } from '../services/authService';
 import { getAllEvents, getAllUsers } from '../services/databaseService';
@@ -41,7 +39,6 @@ const HomeScreen = ({ navigation }) => {
     loadData();
   }, []);
 
-  // Array de imagens locais para o carrossel (mais rápido e funciona offline)
   const CAROUSEL_IMAGES = [
     { 
       id: '1',
@@ -72,7 +69,6 @@ const HomeScreen = ({ navigation }) => {
         try {
           flatListRef.current.scrollToIndex({ index: next, animated: true });
         } catch (e) {
-          // ignore scroll errors
         }
       }
     }, 3500);
@@ -105,7 +101,6 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // lista reutilizável dos botões principais (usada também para checar ultimo/primeiro indice)
   const BUTTONS = [
     {
       id: '1',
@@ -275,7 +270,7 @@ const styles = StyleSheet.create({
   },
   buttonCardContainer: {
     width: BUTTON_CAROUSEL_WIDTH,
-    paddingHorizontal: 56, // deixa espaço das setas nas laterais
+    paddingHorizontal: 56,
   },
   carouselArrow: {
     width: 40,
@@ -364,18 +359,15 @@ const styles = StyleSheet.create({
   carouselWrap: {
     width: '100%',
     alignItems: 'center',
-    // aumentar o espaçamento entre os botões e o carrossel de imagens
     marginTop: 36,
     marginBottom: 20,
   },
   carouselImage: {
-    // imagens mais largas e com menos margem lateral para dar destaque
     width: CAROUSEL_WIDTH - 24,
     height: CAROUSEL_HEIGHT,
     borderRadius: 12,
     marginHorizontal: 12,
     backgroundColor: '#e1e1e1',
-    // sombra para destacar as imagens
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,

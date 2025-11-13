@@ -1,86 +1,96 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { getNearbyEvents, kmDistance } from '../services/eventsApiService';
 import { getEventsNearby as getEventsNearbyDb } from '../services/firebaseConfig';
 
-// Componente principal da tela de eventos próximos
 const NearbyEventsScreen = ({ navigation }) => {
-  // Hook para acessar cores e tema do contexto
   const { colors, theme } = useTheme();
-  // Estado para controlar o carregamento da tela
   const [loading, setLoading] = useState(true);
-  // Estado para armazenar as coordenadas do usuário
   const [coords, setCoords] = useState(null);
-  // Estado para armazenar a lista de eventos
   const [events, setEvents] = useState([]);
-  // Estado para controlar qual fonte de dados usar
-  const [useSymplaApi, setUseSymplaApi] = useState(true);
-  // Estado para o raio de busca
+  const [useTicketmaster, setUseTicketmaster] = useState(true);
   const [radius, setRadius] = useState(50);
 
-  // Hook para solicitar e obter a localização do usuário quando a tela é carregada
   useEffect(() => {
     (async () => {
       try {
-        // Solicita permissão para acessar a localização
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          // Se a permissão for negada, mostra um alerta
           Alert.alert('Permissão', 'Precisamos da sua localização para buscar eventos próximos.');
           setLoading(false);
           return;
         }
-        // Obtém a posição atual do usuário
         const loc = await Location.getCurrentPositionAsync({});
-        // Armazena as coordenadas no estado
         setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       } catch (e) {
-        // Em caso de erro, mostra um alerta
         Alert.alert('Erro', 'Não foi possível obter localização.');
         setLoading(false);
       }
     })();
   }, []);
 
-  // Hook para buscar eventos quando as coordenadas estiverem disponíveis
   useEffect(() => {
-    (async () => {
-      if (!coords) return;
-      try {
-        setLoading(true);
-        let list = [];
-        
-        if (useSymplaApi) {
-          // Busca eventos da API do Sympla
-          try {
-            list = await getNearbyEvents(coords.latitude, coords.longitude, radius);
-            console.log('Eventos encontrados do Sympla:', list.length);
-          } catch (apiError) {
-            console.error('Erro ao buscar do Sympla, tentando Firebase...', apiError);
-            // Fallback para o Firebase em caso de erro
-            list = await getEventsNearbyDb(coords.latitude, coords.longitude);
-            Alert.alert('Aviso', 'Usando eventos do banco local. A API do Sympla pode estar temporariamente indisponível.');
-          }
-        } else {
-          // Busca eventos do Firebase
-          list = await getEventsNearbyDb(coords.latitude, coords.longitude);
-        }
-        
-        setEvents(list);
-      } catch (e) {
-        console.error('Erro geral:', e);
-        Alert.alert('Erro', 'Falha ao buscar eventos próximos.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [coords, useSymplaApi, radius]);
+    if (coords && useTicketmaster) {
+      fetchEvents();
+    } else if (coords && !useTicketmaster) {
+      fetchFirebaseEvents();
+    }
+  }, [coords, radius, useTicketmaster]);
+
+  const fetchEvents = async () => {
+    setLoading(true);
+    try {
+      const data = await getNearbyEvents(coords.latitude, coords.longitude, radius);
+      setEvents(data);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar os eventos. Verifique sua conexão e tente novamente.');
+      console.error(error);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFirebaseEvents = async () => {
+    setLoading(true);
+    try {
+      const data = await getEventsNearbyDb(coords.latitude, coords.longitude);
+      setEvents(data);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar os eventos do banco de dados.');
+      console.error(error);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRadiusChange = (newRadius) => {
     setRadius(newRadius);
+  };
+
+  const handleOpenUrl = (url, title) => {
+    if (url) {
+      Alert.alert(
+        title,
+        'Deseja abrir o evento no navegador?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Abrir', 
+            onPress: () => Linking.openURL(url).catch(err => {
+              Alert.alert('Erro', 'Não foi possível abrir o link.');
+              console.error(err);
+            })
+          }
+        ]
+      );
+    } else {
+      Alert.alert('Aviso', 'Link não disponível para este evento.');
+    }
   };
 
   const header = (
@@ -91,10 +101,10 @@ const NearbyEventsScreen = ({ navigation }) => {
       <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Eventos próximos</Text>
       <TouchableOpacity 
         style={styles.switchButton}
-        onPress={() => setUseSymplaApi(!useSymplaApi)}
+        onPress={() => setUseTicketmaster(!useTicketmaster)}
       >
         <Ionicons 
-          name={useSymplaApi ? "cloud" : "home"} 
+          name={useTicketmaster ? "ticket" : "home"} 
           size={24} 
           color={colors.primary} 
         />
@@ -104,12 +114,14 @@ const NearbyEventsScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {header}
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          Buscando eventos{useSymplaApi ? ' do Sympla' : ''}...
-        </Text>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            {useTicketmaster ? 'Buscando eventos próximos...' : 'Carregando eventos...'}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -118,8 +130,7 @@ const NearbyEventsScreen = ({ navigation }) => {
     <View style={[styles.container, { backgroundColor: colors.background }]}> 
       {header}
       
-      {/* Filtro de raio - apenas para API Sympla */}
-      {useSymplaApi && (
+      {useTicketmaster && (
         <View style={[styles.filterContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
           <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Raio de busca:</Text>
           <View style={styles.radiusButtons}>
@@ -142,6 +153,9 @@ const NearbyEventsScreen = ({ navigation }) => {
               </TouchableOpacity>
             ))}
           </View>
+          <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
+            {events.length} evento(s) encontrado(s)
+          </Text>
         </View>
       )}
 
@@ -162,55 +176,103 @@ const NearbyEventsScreen = ({ navigation }) => {
                   style={styles.cardImage}
                   resizeMode="cover"
                 />
-              ) : null}
+              ) : (
+                <View style={[styles.placeholderImage, { backgroundColor: colors.border }]}>
+                  <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} />
+                </View>
+              )}
+              
+
               <View style={styles.cardBody}>
                 <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
                   {item.title || item.name}
                 </Text>
-                <Text style={[styles.cardSub, { color: colors.textSecondary }]}>
-                  📅 {item.date}
-                </Text>
-                {dist != null && (
-                  <Text style={[styles.cardSub, { color: colors.textSecondary }]}>
-                    📍 {dist.toFixed(1)} km de distância
-                  </Text>
+                
+                {item.date && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                      {item.date}
+                    </Text>
+                  </View>
                 )}
+                
+                {item.venueName && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                      {item.venueName}
+                    </Text>
+                  </View>
+                )}
+                
+                {item.address && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="navigate-circle-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>
+                      {item.address}
+                    </Text>
+                  </View>
+                )}
+                
                 {item.city && (
-                  <Text style={[styles.cardSub, { color: colors.textSecondary }]}>
-                    {item.city}{item.state ? ` - ${item.state}` : ''}
-                  </Text>
+                  <View style={styles.infoRow}>
+                    <Ionicons name="business-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                      {item.city}{item.state ? ` - ${item.state}` : ''}
+                    </Text>
+                  </View>
                 )}
+                
+                {dist != null && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                    <Text style={[styles.cardSub, { color: colors.primary, marginLeft: 6, fontWeight: '600' }]}>
+                      {dist.toFixed(1)} km de distância
+                    </Text>
+                  </View>
+                )}
+
+                {item.priceRange && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                      R$ {item.priceRange.min} - R$ {item.priceRange.max}
+                    </Text>
+                  </View>
+                )}
+
                 <TouchableOpacity 
-                  style={{ marginTop: 8, alignSelf: 'flex-start' }} 
-                  onPress={() => {
-                    if (item.url) {
-                      // Poderia abrir o link do evento
-                      Alert.alert('Evento', `URL: ${item.url}`);
-                    }
-                  }}
+                  style={[styles.detailsButton, { backgroundColor: colors.primary }]} 
+                  onPress={() => handleOpenUrl(item.url, item.title)}
                 >
-                  <Text style={{ color: colors.primary, fontWeight: '600' }}>
-                    Ver Detalhes
+                  <Text style={styles.detailsButtonText}>
+                    Ver no Ticketmaster
                   </Text>
+                  <Ionicons name="open-outline" size={16} color="white" />
                 </TouchableOpacity>
               </View>
             </View>
           );
         }}
         ListEmptyComponent={
-          <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 24 }}>
-            {useSymplaApi 
-              ? 'Nenhum evento do Sympla encontrado próximo a você. Tente aumentar o raio de busca.'
-              : 'Nenhum evento encontrado.'}
-          </Text>
-        }
-        ListHeaderComponent={
-          events.length > 0 ? (
-            <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-              {events.length} {events.length === 1 ? 'evento encontrado' : 'eventos encontrados'}
-              {useSymplaApi ? ' (Sympla)' : ' (Local)'}
+          <View style={styles.emptyContainer}>
+            <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {useTicketmaster
+                ? 'Nenhum evento encontrado próximo a você.\nTente aumentar o raio de busca.'
+                : 'Nenhum evento encontrado no banco de dados.'}
             </Text>
-          ) : null
+            {useTicketmaster && events.length === 0 && (
+              <TouchableOpacity 
+                style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                onPress={fetchEvents}
+              >
+                <Ionicons name="refresh-outline" size={20} color="white" />
+                <Text style={styles.retryButtonText}>Tentar novamente</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         }
       />
     </View>
@@ -259,28 +321,100 @@ const styles = StyleSheet.create({
   },
   resultCount: {
     fontSize: 14,
-    marginBottom: 12,
+    marginTop: 12,
     fontWeight: '600',
   },
   card: { 
     borderWidth: 1, 
     borderRadius: 12, 
     marginBottom: 12, 
-    overflow: 'hidden' 
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cardImage: { 
     width: '100%', 
     height: 180 
   },
+  placeholderImage: {
+    width: '100%',
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  freeBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    zIndex: 1,
+  },
+  freeBadgeText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
   cardBody: { padding: 12 },
   cardTitle: { 
-    fontSize: 16, 
+    fontSize: 18, 
     fontWeight: '700', 
-    marginBottom: 4 
+    marginBottom: 8 
   },
   cardSub: { 
     fontSize: 14,
-    marginBottom: 2 
+    flex: 1,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+    marginRight: 6,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 8,
   },
 });
 
