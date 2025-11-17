@@ -1,18 +1,47 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert, Linking } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert, Linking, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { getNearbyEvents, kmDistance } from '../services/eventsApiService';
 import { getEventsNearby as getEventsNearbyDb } from '../services/firebaseConfig';
 
-const NearbyEventsScreen = ({ navigation }) => {
+const NearbyEventsScreen = ({ navigation, route }) => {
   const { colors, theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [coords, setCoords] = useState(null);
   const [events, setEvents] = useState([]);
+  const [filteredEvents, setFilteredEvents] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [useTicketmaster, setUseTicketmaster] = useState(true);
   const [radius, setRadius] = useState(50);
+  const [highlightedEventId, setHighlightedEventId] = useState(null);
+  const flatListRef = useRef(null);
+
+  // Recebe evento selecionado do carrossel da Home
+  useEffect(() => {
+    if (route.params?.selectedEvent && route.params?.scrollToEvent) {
+      const selectedEvent = route.params.selectedEvent;
+      setHighlightedEventId(selectedEvent.id);
+      
+      // Aguarda um pouco para garantir que a lista foi renderizada
+      setTimeout(() => {
+        const eventIndex = filteredEvents.findIndex(e => e.id === selectedEvent.id);
+        if (eventIndex !== -1 && flatListRef.current) {
+          flatListRef.current.scrollToIndex({
+            index: eventIndex,
+            animated: true,
+            viewPosition: 0.5, // Centraliza o item na tela
+          });
+        }
+      }, 500);
+
+      // Remove o highlight após 3 segundos
+      setTimeout(() => {
+        setHighlightedEventId(null);
+      }, 3000);
+    }
+  }, [route.params, filteredEvents]);
 
   useEffect(() => {
     (async () => {
@@ -40,15 +69,40 @@ const NearbyEventsScreen = ({ navigation }) => {
     }
   }, [coords, radius, useTicketmaster]);
 
+  // Filtrar eventos quando a busca ou a lista mudar
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredEvents(events);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = events.filter(event => {
+        const title = (event.title || event.name || '').toLowerCase();
+        const city = (event.city || '').toLowerCase();
+        const venueName = (event.venueName || '').toLowerCase();
+        const category = (event.classifications || event.categories || '').toLowerCase();
+        
+        return (
+          title.includes(query) ||
+          city.includes(query) ||
+          venueName.includes(query) ||
+          category.includes(query)
+        );
+      });
+      setFilteredEvents(filtered);
+    }
+  }, [searchQuery, events]);
+
   const fetchEvents = async () => {
     setLoading(true);
     try {
       const data = await getNearbyEvents(coords.latitude, coords.longitude, radius);
       setEvents(data);
+      setFilteredEvents(data);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível carregar os eventos. Verifique sua conexão e tente novamente.');
       console.error(error);
       setEvents([]);
+      setFilteredEvents([]);
     } finally {
       setLoading(false);
     }
@@ -59,10 +113,12 @@ const NearbyEventsScreen = ({ navigation }) => {
     try {
       const data = await getEventsNearbyDb(coords.latitude, coords.longitude);
       setEvents(data);
+      setFilteredEvents(data);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível carregar os eventos do banco de dados.');
       console.error(error);
       setEvents([]);
+      setFilteredEvents([]);
     } finally {
       setLoading(false);
     }
@@ -91,6 +147,10 @@ const NearbyEventsScreen = ({ navigation }) => {
     } else {
       Alert.alert('Aviso', 'Link não disponível para este evento.');
     }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
   const header = (
@@ -130,6 +190,27 @@ const NearbyEventsScreen = ({ navigation }) => {
     <View style={[styles.container, { backgroundColor: colors.background }]}> 
       {header}
       
+      {/* Barra de pesquisa */}
+      <View style={[styles.searchContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
+        <View style={[styles.searchBar, { backgroundColor: theme === 'dark' ? colors.background : '#f5f5f5' }]}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            placeholder="Buscar eventos, locais, categorias..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {useTicketmaster && (
         <View style={[styles.filterContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
           <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Raio de busca:</Text>
@@ -154,22 +235,37 @@ const NearbyEventsScreen = ({ navigation }) => {
             ))}
           </View>
           <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-            {events.length} evento(s) encontrado(s)
+            {searchQuery ? `${filteredEvents.length} resultado(s) encontrado(s)` : `${events.length} evento(s) encontrado(s)`}
           </Text>
         </View>
       )}
 
       <FlatList
-        data={events}
+        ref={flatListRef}
+        data={filteredEvents}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ padding: 16 }}
+        onScrollToIndexFailed={(info) => {
+          // Fallback caso o scroll falhe
+          const wait = new Promise(resolve => setTimeout(resolve, 500));
+          wait.then(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+          });
+        }}
         renderItem={({ item }) => {
           const dist = item.distance || (item.latitude && item.longitude && coords 
             ? kmDistance(coords.latitude, coords.longitude, item.latitude, item.longitude) 
             : null);
 
+          // Verifica se este card deve ser destacado
+          const isHighlighted = highlightedEventId === item.id;
+
           return (
-            <View style={[styles.card, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderColor: colors.border }]}> 
+            <View style={[
+              styles.card, 
+              { backgroundColor: theme === 'dark' ? colors.card : 'white', borderColor: colors.border },
+              isHighlighted && styles.highlightedCard
+            ]}> 
               {item.image ? (
                 <Image 
                   source={{ uri: item.image }} 
@@ -181,7 +277,14 @@ const NearbyEventsScreen = ({ navigation }) => {
                   <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} />
                 </View>
               )}
-              
+
+              {/* Badge "Evento em Destaque" se vier do carrossel */}
+              {isHighlighted && (
+                <View style={styles.featuredBadge}>
+                  <Ionicons name="star" size={16} color="white" />
+                  <Text style={styles.featuredBadgeText}>Evento em Destaque</Text>
+                </View>
+              )}
 
               <View style={styles.cardBody}>
                 <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
@@ -257,13 +360,15 @@ const NearbyEventsScreen = ({ navigation }) => {
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
+            <Ionicons name={searchQuery ? "search" : "calendar-outline"} size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {useTicketmaster
-                ? 'Nenhum evento encontrado próximo a você.\nTente aumentar o raio de busca.'
-                : 'Nenhum evento encontrado no banco de dados.'}
+              {searchQuery 
+                ? `Nenhum evento encontrado para "${searchQuery}".\nTente buscar por outro termo.`
+                : useTicketmaster
+                  ? 'Nenhum evento encontrado próximo a você.\nTente aumentar o raio de busca.'
+                  : 'Nenhum evento encontrado no banco de dados.'}
             </Text>
-            {useTicketmaster && events.length === 0 && (
+            {useTicketmaster && events.length === 0 && !searchQuery && (
               <TouchableOpacity 
                 style={[styles.retryButton, { backgroundColor: colors.primary }]}
                 onPress={fetchEvents}
@@ -294,6 +399,28 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14 },
+  searchContainer: {
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
+  clearButton: {
+    padding: 4,
+  },
   filterContainer: {
     padding: 16,
     borderBottomWidth: 1,
@@ -335,6 +462,32 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  highlightedCard: {
+    borderWidth: 3,
+    borderColor: '#8B5CF6',
+    shadowColor: '#8B5CF6',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+    zIndex: 1,
+  },
+  featuredBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   cardImage: { 
     width: '100%', 
     height: 180 
@@ -344,21 +497,6 @@ const styles = StyleSheet.create({
     height: 180,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  freeBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    zIndex: 1,
-  },
-  freeBadgeText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 12,
   },
   cardBody: { padding: 12 },
   cardTitle: { 

@@ -1,79 +1,90 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert, FlatList, Dimensions } from "react-native";
+import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, ActivityIndicator, FlatList, Dimensions } from "react-native";
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Location from 'expo-location';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CAROUSEL_WIDTH = SCREEN_WIDTH;
 const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.68);
 const BUTTON_CAROUSEL_WIDTH = SCREEN_WIDTH;
+
 import { useAuth } from '../contexts/AuthContext';
-import { logoutUser } from '../services/authService';
-import { getAllEvents, getAllUsers } from '../services/databaseService';
+import { getNearbyEvents } from '../services/eventsApiService';
 import EventosCard from '../components/EventosCard';
 
 const HomeScreen = ({ navigation }) => {
   const { isLoggedIn, user, loading } = useAuth();
   
-  const [events, setEvents] = useState({});
-  const [users, setUsers] = useState({});
-  const [dataLoading, setDataLoading] = useState(true);
+  const [carouselEvents, setCarouselEvents] = useState([]);
+  const [carouselLoading, setCarouselLoading] = useState(true);
 
+  // Carregar eventos para o carrossel
   useEffect(() => {
-    const loadData = async () => {
+    const loadCarouselEvents = async () => {
       try {
-        setDataLoading(true);
-        const [eventsData, usersData] = await Promise.all([
-          getAllEvents(),
-          getAllUsers()
-        ]);
-        setEvents(eventsData);
-        setUsers(usersData);
+        setCarouselLoading(true);
+        
+        // Pega localização do usuário
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({});
+          const latitude = loc.coords.latitude;
+          const longitude = loc.coords.longitude;
+          
+          // Busca eventos próximos
+          const events = await getNearbyEvents(latitude, longitude, 100);
+          
+          // Filtra apenas eventos com imagem e pega os 5 primeiros
+          const eventsWithImages = events
+            .filter(event => event.image)
+            .slice(0, 5);
+          
+          setCarouselEvents(eventsWithImages);
+        } else {
+          // Se não tiver permissão, busca eventos de uma localização padrão (São Paulo)
+          const events = await getNearbyEvents(-23.5505, -46.6333, 100);
+          const eventsWithImages = events
+            .filter(event => event.image)
+            .slice(0, 5);
+          
+          setCarouselEvents(eventsWithImages);
+        }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        console.error('Erro ao carregar eventos do carrossel:', error);
+        // Em caso de erro, mantém array vazio
+        setCarouselEvents([]);
       } finally {
-        setDataLoading(false);
+        setCarouselLoading(false);
       }
     };
 
-    loadData();
+    loadCarouselEvents();
   }, []);
-
-  const CAROUSEL_IMAGES = [
-    { 
-      id: '1',
-      source: require('../assets/evento1.jpg')  
-    },
-    {
-      id: '2',
-      source: require('../assets/evento2.jpg')  
-    },
-    {
-      id: '3',
-      source: require('../assets/evento3.jpg')  
-    }
-  ];
 
   const flatListRef = useRef(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [buttonCarouselIndex, setButtonCarouselIndex] = useState(0);
   const buttonsFlatListRef = useRef(null);
-  
 
+  // Auto-scroll do carrossel
   useEffect(() => {
-    if (!CAROUSEL_IMAGES || CAROUSEL_IMAGES.length <= 1) return;
+    if (!carouselEvents || carouselEvents.length <= 1 || carouselLoading) return;
+    
     const interval = setInterval(() => {
-      const next = (carouselIndex + 1) % CAROUSEL_IMAGES.length;
+      const next = (carouselIndex + 1) % carouselEvents.length;
       setCarouselIndex(next);
       if (flatListRef.current) {
         try {
           flatListRef.current.scrollToIndex({ index: next, animated: true });
         } catch (e) {
+          console.log('Erro ao fazer scroll:', e);
         }
       }
-    }, 3500);
+    }, 4000);
+    
     return () => clearInterval(interval);
-  }, [carouselIndex]);
+  }, [carouselIndex, carouselEvents, carouselLoading]);
 
   const checkLoginRequired = (actionName) => {
     if (!isLoggedIn) {
@@ -123,7 +134,7 @@ const HomeScreen = ({ navigation }) => {
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
         <View style={styles.container}>
-          {/* Header com botão de login */}
+          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft} />
           </View>
@@ -195,29 +206,104 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Carousel de imagens usando assets locais */}
+          {/* Título do carrossel */}
+          <Text style={styles.carouselTitle}>Eventos em Destaque</Text>
+
+          {/* Carousel de eventos da API */}
           <View style={styles.carouselWrap}>
-            <FlatList
-              ref={flatListRef}
-              data={CAROUSEL_IMAGES}
-              keyExtractor={(item) => item.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <Image
-                  source={item.source}
-                  style={styles.carouselImage}
-                  resizeMode="cover"
-                />
-              )}
-              onMomentumScrollEnd={(ev) => {
-                const width = ev.nativeEvent.layoutMeasurement.width;
-                const index = Math.round(ev.nativeEvent.contentOffset.x / width);
-                setCarouselIndex(index);
-              }}
-              getItemLayout={(data, index) => ({ length: CAROUSEL_WIDTH, offset: CAROUSEL_WIDTH * index, index })}
-            />
+            {carouselLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+                <Text style={styles.loadingText}>Carregando eventos...</Text>
+              </View>
+            ) : carouselEvents.length > 0 ? (
+              <FlatList
+                ref={flatListRef}
+                data={carouselEvents}
+                keyExtractor={(item) => item.id}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.carouselImageContainer}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      // Redireciona para NearbyEvents e passa o evento selecionado
+                      navigation.navigate('NearbyEvents', { 
+                        selectedEvent: item,
+                        scrollToEvent: true 
+                      });
+                    }}
+                  >
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.carouselImage}
+                      resizeMode="cover"
+                    />
+                    {/* Overlay com informações do evento */}
+                    <View style={styles.eventOverlay}>
+                      <View style={styles.eventInfo}>
+                        <Text style={styles.eventTitle} numberOfLines={2}>
+                          {item.title || item.name}
+                        </Text>
+                        {item.date && (
+                          <View style={styles.eventDateRow}>
+                            <Ionicons name="calendar-outline" size={14} color="white" />
+                            <Text style={styles.eventDate} numberOfLines={1}>
+                              {item.date}
+                            </Text>
+                          </View>
+                        )}
+                        {item.city && (
+                          <View style={styles.eventLocationRow}>
+                            <Ionicons name="location-outline" size={14} color="white" />
+                            <Text style={styles.eventLocation} numberOfLines={1}>
+                              {item.city}{item.state ? `, ${item.state}` : ''}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      {/* Badge indicando que é clicável */}
+                      <View style={styles.clickableBadge}>
+                        <Text style={styles.clickableBadgeText}>Ver Detalhes</Text>
+                        <Ionicons name="arrow-forward" size={12} color="white" />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                onMomentumScrollEnd={(ev) => {
+                  const width = ev.nativeEvent.layoutMeasurement.width;
+                  const index = Math.round(ev.nativeEvent.contentOffset.x / width);
+                  setCarouselIndex(index);
+                }}
+                getItemLayout={(data, index) => ({ 
+                  length: CAROUSEL_WIDTH, 
+                  offset: CAROUSEL_WIDTH * index, 
+                  index 
+                })}
+              />
+            ) : (
+              <View style={styles.emptyCarousel}>
+                <Ionicons name="images-outline" size={48} color="#C7C7CC" />
+                <Text style={styles.emptyText}>Nenhum evento disponível no momento</Text>
+              </View>
+            )}
+
+            {/* Indicadores de página */}
+            {!carouselLoading && carouselEvents.length > 1 && (
+              <View style={styles.pagination}>
+                {carouselEvents.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.paginationDot,
+                      index === carouselIndex && styles.paginationDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
           </View>
 
           <StatusBar style="auto" />
@@ -301,26 +387,6 @@ const styles = StyleSheet.create({
   headerLeft: {
     width: 40,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#8B5CF6',
-    textTransform: 'lowercase',
-  },
-  loginButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  loggedInButton: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
-  },
   subTitle: {
     fontSize: 18,
     textAlign: 'center',
@@ -356,23 +422,130 @@ const styles = StyleSheet.create({
     height: 35,
     marginBottom: 2,
   },
+  carouselTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 24,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   carouselWrap: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 36,
     marginBottom: 20,
   },
-  carouselImage: {
+  carouselImageContainer: {
     width: CAROUSEL_WIDTH - 24,
     height: CAROUSEL_HEIGHT,
-    borderRadius: 12,
     marginHorizontal: 12,
+  },
+  carouselImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
     backgroundColor: '#e1e1e1',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 8,
+  },
+  eventOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  eventInfo: {
+    gap: 4,
+    flex: 1,
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  eventDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eventDate: {
+    fontSize: 12,
+    color: 'white',
+    flex: 1,
+  },
+  eventLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  eventLocation: {
+    fontSize: 12,
+    color: 'white',
+    flex: 1,
+  },
+  clickableBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  clickableBadgeText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    width: CAROUSEL_WIDTH - 24,
+    height: CAROUSEL_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e1e1e1',
+    borderRadius: 12,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyCarousel: {
+    width: CAROUSEL_WIDTH - 24,
+    height: CAROUSEL_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e1e1e1',
+    borderRadius: 12,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#C7C7CC',
+  },
+  paginationDotActive: {
+    backgroundColor: '#8B5CF6',
+    width: 24,
   },
 });
 
