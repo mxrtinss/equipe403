@@ -12,6 +12,7 @@ import EditProfileScreen from './screens/EditProfileScreen';
 import NearbyEventsScreen from './screens/NearbyEventsScreen';
 import CreateEventScreen from './screens/CreateEventScreen';
 import MyEventsScreen from './screens/MyEventsScreen';
+import EventsMapScreen from './screens/EventsMapScreen';
 import { EventsProvider } from './contexts/EventsContext';
 import * as Notifications from 'expo-notifications';
 
@@ -34,6 +35,7 @@ const AppNavigator = () => {
         <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="NearbyEvents" component={NearbyEventsScreen} />
+        <Stack.Screen name="EventsMap" component={EventsMapScreen} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
       </Stack.Navigator>
