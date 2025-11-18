@@ -153,22 +153,43 @@ const NearbyEventsScreen = ({ navigation, route }) => {
     setSearchQuery('');
   };
 
+  const navigateToMap = () => {
+    navigation.navigate('EventsMap', {
+      events: filteredEvents,
+      coords: coords,
+      useTicketmaster: useTicketmaster,
+      radius: radius,
+    });
+  };
+
   const header = (
     <View style={[styles.header, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}> 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="arrow-back" size={24} color={colors.primary} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Eventos próximos</Text>
-      <TouchableOpacity 
-        style={styles.switchButton}
-        onPress={() => setUseTicketmaster(!useTicketmaster)}
-      >
-        <Ionicons 
-          name={useTicketmaster ? "ticket" : "home"} 
-          size={24} 
-          color={colors.primary} 
-        />
-      </TouchableOpacity>
+      <View style={styles.headerRight}>
+        <TouchableOpacity 
+          style={styles.mapButton}
+          onPress={navigateToMap}
+        >
+          <Ionicons 
+            name="map-outline" 
+            size={24} 
+            color={colors.primary} 
+          />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.switchButton}
+          onPress={() => setUseTicketmaster(!useTicketmaster)}
+        >
+          <Ionicons 
+            name={useTicketmaster ? "ticket" : "home"} 
+            size={24} 
+            color={colors.primary} 
+          />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -395,6 +416,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1 
   },
   backButton: { padding: 8 },
+  headerRight: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    gap: 8,
+  },
+  mapButton: { padding: 8 },
   switchButton: { padding: 8 },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
