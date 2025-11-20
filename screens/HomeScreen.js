@@ -10,11 +10,13 @@ const CAROUSEL_HEIGHT = Math.round(CAROUSEL_WIDTH * 0.68);
 const BUTTON_CAROUSEL_WIDTH = SCREEN_WIDTH;
 
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { getNearbyEvents } from '../services/eventsApiService';
 import EventosCard from '../components/EventosCard';
 
 const HomeScreen = ({ navigation }) => {
   const { isLoggedIn, user, loading } = useAuth();
+  const { colors, theme } = useTheme();
   
   const [carouselEvents, setCarouselEvents] = useState([]);
   const [carouselLoading, setCarouselLoading] = useState(true);
@@ -130,6 +132,8 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
+  const styles = createStyles(colors, theme);
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
@@ -160,7 +164,7 @@ const HomeScreen = ({ navigation }) => {
                 }
               }}
             >
-              <Ionicons name="chevron-back" size={24} color={buttonCarouselIndex === 0 ? '#C7C7CC' : '#8B5CF6'} />
+              <Ionicons name="chevron-back" size={24} color={buttonCarouselIndex === 0 ? colors.textTertiary : colors.primary} />
             </TouchableOpacity>
 
             <FlatList
@@ -202,7 +206,7 @@ const HomeScreen = ({ navigation }) => {
                 }
               }}
             >
-              <Ionicons name="chevron-forward" size={24} color={buttonCarouselIndex >= BUTTONS.length - 1 ? '#C7C7CC' : '#8B5CF6'} />
+              <Ionicons name="chevron-forward" size={24} color={buttonCarouselIndex >= BUTTONS.length - 1 ? colors.textTertiary : colors.primary} />
             </TouchableOpacity>
           </View>
 
@@ -213,7 +217,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.carouselWrap}>
             {carouselLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Carregando eventos...</Text>
               </View>
             ) : carouselEvents.length > 0 ? (
@@ -285,7 +289,7 @@ const HomeScreen = ({ navigation }) => {
               />
             ) : (
               <View style={styles.emptyCarousel}>
-                <Ionicons name="images-outline" size={48} color="#C7C7CC" />
+                <Ionicons name="images-outline" size={48} color={colors.textTertiary} />
                 <Text style={styles.emptyText}>Nenhum evento disponível no momento</Text>
               </View>
             )}
@@ -306,7 +310,7 @@ const HomeScreen = ({ navigation }) => {
             )}
           </View>
 
-          <StatusBar style="auto" />
+          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
         </View>
       </ScrollView>
       
@@ -337,13 +341,13 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, theme) => StyleSheet.create({
   scrollViewContainer: {
     paddingBottom: 80,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   container: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
     paddingTop: 40,
     alignItems: 'center',
   },
@@ -363,14 +367,17 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
     borderRadius: 20,
     position: 'absolute',
     zIndex: 1,
     left: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   carouselArrowDisabled: {
-    backgroundColor: 'rgba(200,200,200,0.6)',
+    backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.5)' : 'rgba(200, 200, 200, 0.5)',
+    opacity: 0.5,
   },
   carouselArrowRight: {
     left: undefined,
@@ -390,7 +397,7 @@ const styles = StyleSheet.create({
   subTitle: {
     fontSize: 18,
     textAlign: 'center',
-    color: '#333',
+    color: colors.textSecondary,
     marginBottom: 20,
   },
   logo: {
@@ -403,15 +410,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.card,
     paddingVertical: 12,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   footerOption: {
     alignItems: 'center',
@@ -421,11 +430,12 @@ const styles = StyleSheet.create({
     width: 35,
     height: 35,
     marginBottom: 2,
+    tintColor: colors.textSecondary,
   },
   carouselTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     marginTop: 24,
     marginBottom: 12,
     textAlign: 'center',
@@ -444,14 +454,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 12,
-    backgroundColor: '#e1e1e1',
+    backgroundColor: colors.separator,
   },
   eventOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
     padding: 12,
@@ -492,7 +502,7 @@ const styles = StyleSheet.create({
   clickableBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -508,26 +518,30 @@ const styles = StyleSheet.create({
     height: CAROUSEL_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e1e1e1',
+    backgroundColor: colors.separator,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
   emptyCarousel: {
     width: CAROUSEL_WIDTH - 24,
     height: CAROUSEL_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e1e1e1',
+    backgroundColor: colors.separator,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   emptyText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   pagination: {
@@ -541,10 +555,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#C7C7CC',
+    backgroundColor: colors.textTertiary,
   },
   paginationDotActive: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.primary,
     width: 24,
   },
 });
