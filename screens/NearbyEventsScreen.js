@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert, Linking, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert, Linking, TextInput, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getNearbyEvents, kmDistance } from '../services/eventsApiService';
-import { getEventsNearby as getEventsNearbyDb } from '../services/firebaseConfig';
+import { getEventsNearby as getEventsNearbyDb, addFavoriteEvent, removeFavoriteEvent, getUserFavorites } from '../services/firebaseConfig';
 
 const NearbyEventsScreen = ({ navigation, route }) => {
   const { colors, theme } = useTheme();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [coords, setCoords] = useState(null);
   const [events, setEvents] = useState([]);
@@ -16,7 +18,21 @@ const NearbyEventsScreen = ({ navigation, route }) => {
   const [useTicketmaster, setUseTicketmaster] = useState(true);
   const [radius, setRadius] = useState(50);
   const [highlightedEventId, setHighlightedEventId] = useState(null);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showFilters, setShowFilters] = useState(true);
   const flatListRef = useRef(null);
+
+  // Categorias disponíveis
+  const categories = [
+    { id: 'all', name: 'Todos', icon: 'apps' },
+    { id: 'Music', name: 'Música', icon: 'musical-notes' },
+    { id: 'Sports', name: 'Esportes', icon: 'football' },
+    { id: 'Arts & Theatre', name: 'Arte & Teatro', icon: 'color-palette' },
+    { id: 'Film', name: 'Cinema', icon: 'film' },
+    { id: 'Family', name: 'Família', icon: 'people' },
+    { id: 'Miscellaneous', name: 'Outros', icon: 'ellipsis-horizontal' },
+  ];
 
   // Recebe evento selecionado do carrossel da Home
   useEffect(() => {
@@ -69,13 +85,40 @@ const NearbyEventsScreen = ({ navigation, route }) => {
     }
   }, [coords, radius, useTicketmaster]);
 
-  // Filtrar eventos quando a busca ou a lista mudar
+  // Carrega favoritos do usuário
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredEvents(events);
-    } else {
+    if (user?.uid) {
+      loadFavorites();
+    }
+  }, [user]);
+
+  const loadFavorites = async () => {
+    if (!user?.uid) return;
+    try {
+      const favorites = await getUserFavorites(user.uid);
+      const ids = new Set(favorites.map(fav => fav.eventId));
+      setFavoriteIds(ids);
+    } catch (error) {
+      console.error('Erro ao carregar favoritos:', error);
+    }
+  };
+
+  // Filtrar eventos quando a busca, categoria ou a lista mudar
+  useEffect(() => {
+    let filtered = events;
+
+    // Filtro por categoria
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(event => {
+        const eventCategory = event.classifications || '';
+        return eventCategory.toLowerCase().includes(selectedCategory.toLowerCase());
+      });
+    }
+
+    // Filtro por busca
+    if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase();
-      const filtered = events.filter(event => {
+      filtered = filtered.filter(event => {
         const title = (event.title || event.name || '').toLowerCase();
         const city = (event.city || '').toLowerCase();
         const venueName = (event.venueName || '').toLowerCase();
@@ -88,9 +131,10 @@ const NearbyEventsScreen = ({ navigation, route }) => {
           category.includes(query)
         );
       });
-      setFilteredEvents(filtered);
     }
-  }, [searchQuery, events]);
+
+    setFilteredEvents(filtered);
+  }, [searchQuery, events, selectedCategory]);
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -162,12 +206,64 @@ const NearbyEventsScreen = ({ navigation, route }) => {
     });
   };
 
+  const handleToggleFavorite = async (event) => {
+    if (!user) {
+      Alert.alert(
+        'Login necessário',
+        'Você precisa fazer login para favoritar eventos.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Fazer Login', onPress: () => navigation.navigate('Login') }
+        ]
+      );
+      return;
+    }
+
+    const isFavorited = favoriteIds.has(event.id);
+
+    try {
+      if (isFavorited) {
+        // Remove dos favoritos
+        await removeFavoriteEvent(user.uid, event.id);
+        setFavoriteIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(event.id);
+          return newSet;
+        });
+      } else {
+        // Adiciona aos favoritos - prepara objeto completo
+        const favoriteEvent = {
+          eventId: event.id, // ID único do evento
+          title: event.title || event.name,
+          image: event.image || null,
+          date: event.date || null,
+          time: event.time || null,
+          venueName: event.venueName || null,
+          address: event.address || null,
+          city: event.city || null,
+          state: event.state || null,
+          url: event.url || null,
+          latitude: event.latitude || null,
+          longitude: event.longitude || null,
+          createdAt: new Date().toISOString(),
+        };
+        
+        await addFavoriteEvent(user.uid, favoriteEvent);
+        setFavoriteIds(prev => new Set(prev).add(event.id));
+        Alert.alert('Favoritado', 'Evento adicionado aos favoritos!\nVeja em "Meus Eventos".');
+      }
+    } catch (error) {
+      console.error('Erro ao favoritar:', error);
+      Alert.alert('Erro', 'Não foi possível favoritar o evento.');
+    }
+  };
+
   const header = (
-    <View style={[styles.header, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}> 
+    <View style={[styles.header, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}> 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="arrow-back" size={24} color={colors.primary} />
       </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Eventos próximos</Text>
+      <Text style={[styles.headerTitle, { color: '#1f2937' }]}>Eventos próximos</Text>
       <View style={styles.headerRight}>
         <TouchableOpacity 
           style={styles.mapButton}
@@ -195,11 +291,11 @@ const NearbyEventsScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: '#f9fafb' }]}>
         {header}
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <Text style={[styles.loadingText, { color: '#6b7280' }]}>
             {useTicketmaster ? 'Buscando eventos próximos...' : 'Carregando eventos...'}
           </Text>
         </View>
@@ -208,17 +304,17 @@ const NearbyEventsScreen = ({ navigation, route }) => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+    <View style={[styles.container, { backgroundColor: '#f9fafb' }]}> 
       {header}
       
       {/* Barra de pesquisa */}
-      <View style={[styles.searchContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme === 'dark' ? colors.background : '#f5f5f5' }]}>
-          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
+        <View style={[styles.searchBar, { backgroundColor: '#f5f5f5' }]}>
+          <Ionicons name="search" size={20} color="#6b7280" style={styles.searchIcon} />
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary }]}
+            style={[styles.searchInput, { color: '#1f2937' }]}
             placeholder="Buscar eventos, locais, categorias..."
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor="#9ca3af"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCorrect={false}
@@ -226,15 +322,78 @@ const NearbyEventsScreen = ({ navigation, route }) => {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              <Ionicons name="close-circle" size={20} color="#6b7280" />
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Botão para mostrar/ocultar filtros */}
+        {useTicketmaster && (
+          <TouchableOpacity 
+            style={[styles.toggleFiltersButton, { backgroundColor: '#f5f5f5' }]}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+            <Ionicons 
+              name={showFilters ? "funnel" : "funnel-outline"} 
+              size={18} 
+              color={showFilters ? '#8B5CF6' : '#6b7280'} 
+            />
+            <Text style={[
+              styles.toggleFiltersText, 
+              { color: showFilters ? '#8B5CF6' : '#6b7280' }
+            ]}>
+              Filtros
+            </Text>
+            <Ionicons 
+              name={showFilters ? "chevron-up" : "chevron-down"} 
+              size={16} 
+              color={showFilters ? '#8B5CF6' : '#6b7280'} 
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {useTicketmaster && (
-        <View style={[styles.filterContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
-          <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Raio de busca:</Text>
+      {/* Filtro de Categorias */}
+      {useTicketmaster && showFilters && (
+        <View style={[styles.categoryContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
+          <Text style={[styles.categoryLabel, { color: '#6b7280' }]}>Categorias:</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScroll}
+          >
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[
+                  styles.categoryChip,
+                  { 
+                    backgroundColor: selectedCategory === cat.id ? '#8B5CF6' : '#f5f5f5',
+                    borderColor: selectedCategory === cat.id ? '#8B5CF6' : '#e5e5e5',
+                  }
+                ]}
+                onPress={() => setSelectedCategory(cat.id)}
+              >
+                <Ionicons 
+                  name={cat.icon} 
+                  size={16} 
+                  color={selectedCategory === cat.id ? 'white' : '#6b7280'} 
+                />
+                <Text style={[
+                  styles.categoryChipText,
+                  { color: selectedCategory === cat.id ? 'white' : '#1f2937' }
+                ]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {useTicketmaster && showFilters && (
+        <View style={[styles.filterContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
+          <Text style={[styles.filterLabel, { color: '#6b7280' }]}>Raio de busca:</Text>
           <View style={styles.radiusButtons}>
             {[10, 25, 50, 100].map((r) => (
               <TouchableOpacity
@@ -255,8 +414,10 @@ const NearbyEventsScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-            {searchQuery ? `${filteredEvents.length} resultado(s) encontrado(s)` : `${events.length} evento(s) encontrado(s)`}
+          <Text style={[styles.resultCount, { color: '#6b7280' }]}>
+            {searchQuery || selectedCategory !== 'all' 
+              ? `${filteredEvents.length} resultado(s) encontrado(s)` 
+              : `${events.length} evento(s) encontrado(s)`}
           </Text>
         </View>
       )}
@@ -284,7 +445,7 @@ const NearbyEventsScreen = ({ navigation, route }) => {
           return (
             <View style={[
               styles.card, 
-              { backgroundColor: theme === 'dark' ? colors.card : 'white', borderColor: colors.border },
+              { backgroundColor: 'white', borderColor: '#e5e5e5' },
               isHighlighted && styles.highlightedCard
             ]}> 
               {item.image ? (
@@ -294,8 +455,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                   resizeMode="cover"
                 />
               ) : (
-                <View style={[styles.placeholderImage, { backgroundColor: colors.border }]}>
-                  <Ionicons name="calendar-outline" size={48} color={colors.textSecondary} />
+                <View style={[styles.placeholderImage, { backgroundColor: '#f3f4f6' }]}>
+                  <Ionicons name="calendar-outline" size={48} color="#9ca3af" />
                 </View>
               )}
 
@@ -307,15 +468,27 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 </View>
               )}
 
+              {/* Botão de Favoritar */}
+              <TouchableOpacity 
+                style={styles.favoriteButton}
+                onPress={() => handleToggleFavorite(item)}
+              >
+                <Ionicons 
+                  name={favoriteIds.has(item.id) ? "heart" : "heart-outline"} 
+                  size={28} 
+                  color={favoriteIds.has(item.id) ? "#EF4444" : "white"} 
+                />
+              </TouchableOpacity>
+
               <View style={styles.cardBody}>
-                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                <Text style={[styles.cardTitle, { color: '#1f2937' }]}>
                   {item.title || item.name}
                 </Text>
                 
                 {item.date && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
-                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
                       {item.date}
                     </Text>
                   </View>
@@ -323,8 +496,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 
                 {item.venueName && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
-                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                    <Ionicons name="location-outline" size={16} color="#6b7280" />
+                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
                       {item.venueName}
                     </Text>
                   </View>
@@ -332,8 +505,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 
                 {item.address && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="navigate-circle-outline" size={16} color={colors.textSecondary} />
-                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>
+                    <Ionicons name="navigate-circle-outline" size={16} color="#6b7280" />
+                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]} numberOfLines={1}>
                       {item.address}
                     </Text>
                   </View>
@@ -341,8 +514,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 
                 {item.city && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="business-outline" size={16} color={colors.textSecondary} />
-                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                    <Ionicons name="business-outline" size={16} color="#6b7280" />
+                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
                       {item.city}{item.state ? ` - ${item.state}` : ''}
                     </Text>
                   </View>
@@ -359,8 +532,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
 
                 {item.priceRange && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
-                    <Text style={[styles.cardSub, { color: colors.textSecondary, marginLeft: 6 }]}>
+                    <Ionicons name="pricetag-outline" size={16} color="#6b7280" />
+                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
                       R$ {item.priceRange.min} - R$ {item.priceRange.max}
                     </Text>
                   </View>
@@ -381,13 +554,15 @@ const NearbyEventsScreen = ({ navigation, route }) => {
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name={searchQuery ? "search" : "calendar-outline"} size={64} color={colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            <Ionicons name={searchQuery ? "search" : "calendar-outline"} size={64} color="#9ca3af" />
+            <Text style={[styles.emptyText, { color: '#6b7280' }]}>
               {searchQuery 
                 ? `Nenhum evento encontrado para "${searchQuery}".\nTente buscar por outro termo.`
-                : useTicketmaster
-                  ? 'Nenhum evento encontrado próximo a você.\nTente aumentar o raio de busca.'
-                  : 'Nenhum evento encontrado no banco de dados.'}
+                : selectedCategory !== 'all'
+                  ? `Nenhum evento encontrado na categoria "${categories.find(c => c.id === selectedCategory)?.name}".\nTente outra categoria.`
+                  : useTicketmaster
+                    ? 'Nenhum evento encontrado próximo a você.\nTente aumentar o raio de busca.'
+                    : 'Nenhum evento encontrado no banco de dados.'}
             </Text>
             {useTicketmaster && events.length === 0 && !searchQuery && (
               <TouchableOpacity 
@@ -447,6 +622,48 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
+  },
+  toggleFiltersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  toggleFiltersText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  categoryContainer: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  categoryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  categoryScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    gap: 6,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   filterContainer: {
     padding: 16,
@@ -514,6 +731,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
   cardImage: { 
     width: '100%', 

@@ -11,6 +11,7 @@ import {
   Switch,
   Modal,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -244,214 +245,246 @@ const ProfileSettingsScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-        <Text style={styles.loadingText}>Carregando perfil...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <Text style={styles.loadingText}>Carregando perfil...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configurações</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      {/* Perfil do usuário */}
-      <View style={[styles.profileSection, darkMode && { backgroundColor: '#111827' }]}>
-        <View style={styles.avatarContainer}>
-          {profile?.fotoPerfil ? (
-            <Image source={{ uri: profile.fotoPerfil }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, darkMode && { backgroundColor: '#1F2937', borderColor: '#374151' }]}>
-              <Ionicons name="person" size={40} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-            </View>
-          )}
+    <SafeAreaView style={[styles.safeArea, darkMode && { backgroundColor: '#0F172A' }]}>
+      <View style={[styles.container, darkMode && { backgroundColor: '#0F172A' }]}>
+        {/* Header fixo */}
+        <View style={[styles.header, darkMode && { backgroundColor: '#111827', borderBottomColor: '#1F2937' }]}>
           <TouchableOpacity 
-            style={styles.editAvatarButton}
-            onPress={handlePickImage}
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="camera" size={16} color="white" />
+            <Ionicons name="arrow-back" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
           </TouchableOpacity>
+          <Text style={[styles.headerTitle, darkMode && { color: 'white' }]}>Configurações</Text>
+          <View style={styles.placeholder} />
         </View>
-        
-        <Text style={[styles.userName, darkMode && { color: 'white' }]}>{profile?.nome || 'Usuário'}</Text>
-        <Text style={[styles.userEmail, darkMode && { color: '#9CA3AF' }]}>{profile?.email || user?.email}</Text>
-        
-        <TouchableOpacity 
-          style={[styles.editButton, darkMode && { backgroundColor: '#111827', borderColor: '#374151' }]}
-          onPress={() => setShowEditModal(true)}
+
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="create-outline" size={16} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-          <Text style={[styles.editButtonText, darkMode && { color: '#A78BFA' }]}>Editar Perfil</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Configurações */}
-      <View style={[styles.settingsSection, darkMode && { backgroundColor: '#111827' }]}>
-        <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Configurações</Text>
-        
-        <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="notifications-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-            <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Notificações</Text>
-          </View>
-          <Switch
-            value={notifications}
-            onValueChange={handleToggleNotifications}
-            trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
-            thumbColor={notifications ? '#8B5CF6' : '#9CA3AF'}
-          />
-        </View>
-
-        <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="moon-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-            <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Modo Escuro</Text>
-          </View>
-          <Switch
-            value={darkMode}
-            onValueChange={(val) => { setDarkMode(val); toggleTheme(); }}
-            trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
-            thumbColor={darkMode ? '#8B5CF6' : '#9CA3AF'}
-          />
-        </View>
-
-        <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
-          <View style={styles.settingInfo}>
-            <Ionicons name="location-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-            <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Serviços de Localização</Text>
-          </View>
-          <Switch
-            value={locationServices}
-            onValueChange={handleToggleLocation}
-            trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
-            thumbColor={locationServices ? '#8B5CF6' : '#9CA3AF'}
-          />
-        </View>
-      </View>
-
-      {/* Ações */}
-      <View style={[styles.actionsSection, darkMode && { backgroundColor: '#111827' }]}>
-        <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Ações</Text>
-        
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out-outline" size={24} color="#EF4444" />
-          <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Sair da Conta</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => setShowDeleteModal(true)}
-        >
-          <Ionicons name="trash-outline" size={24} color="#EF4444" />
-          <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Excluir Conta</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Modal de Edição */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <Text style={styles.modalCancelText}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Editar Perfil</Text>
-            <TouchableOpacity onPress={handleSaveProfile} disabled={saving}>
-              <Text style={styles.modalSaveText}>Salvar</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Nome</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editName}
-                onChangeText={setEditName}
-                placeholder="Digite seu nome"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editEmail}
-                onChangeText={setEditEmail}
-                placeholder="Digite seu email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Foto de Perfil</Text>
-              {!!editPhoto && (
-                <Image source={{ uri: editPhoto }} style={{ width: 120, height: 120, borderRadius: 60, marginBottom: 10 }} />
+          {/* Perfil do usuário */}
+          <View style={[styles.profileSection, darkMode && { backgroundColor: '#111827' }]}>
+            <View style={styles.avatarContainer}>
+              {profile?.fotoPerfil ? (
+                <Image source={{ uri: profile.fotoPerfil }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatarPlaceholder, darkMode && { backgroundColor: '#1F2937', borderColor: '#374151' }]}>
+                  <Ionicons name="person" size={40} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+                </View>
               )}
-              <TouchableOpacity style={[styles.editButton, { marginTop: 10 }]} onPress={handlePickImage}>
-                <Ionicons name="image-outline" size={16} color="#8B5CF6" />
-                <Text style={styles.editButtonText}>Selecionar da Galeria</Text>
+              <TouchableOpacity 
+                style={styles.editAvatarButton}
+                onPress={handlePickImage}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <Ionicons name="camera" size={16} color="white" />
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </View>
-      </Modal>
+            
+            <Text style={[styles.userName, darkMode && { color: 'white' }]}>{profile?.nome || 'Usuário'}</Text>
+            <Text style={[styles.userEmail, darkMode && { color: '#9CA3AF' }]}>{profile?.email || user?.email}</Text>
+            
+            <TouchableOpacity 
+              style={[styles.editButton, darkMode && { backgroundColor: '#111827', borderColor: '#374151' }]}
+              onPress={() => setShowEditModal(true)}
+            >
+              <Ionicons name="create-outline" size={16} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+              <Text style={[styles.editButtonText, darkMode && { color: '#A78BFA' }]}>Editar Perfil</Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* Modal de Confirmação de Exclusão */}
-      <Modal
-        visible={showDeleteModal}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.deleteModalOverlay}>
-          <View style={styles.deleteModalContent}>
-            <Ionicons name="warning" size={48} color="#EF4444" />
-            <Text style={styles.deleteModalTitle}>Excluir Conta</Text>
-            <Text style={styles.deleteModalText}>
-              Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.
-            </Text>
-            <View style={styles.deleteModalButtons}>
-              <TouchableOpacity 
-                style={styles.deleteModalCancel}
-                onPress={() => setShowDeleteModal(false)}
-              >
-                <Text style={styles.deleteModalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.deleteModalConfirm}
-                onPress={handleDeleteAccount}
-                disabled={saving}
-              >
-                <Text style={styles.deleteModalConfirmText}>
-                  {saving ? 'Excluindo...' : 'Excluir'}
-                </Text>
-              </TouchableOpacity>
+          {/* Configurações */}
+          <View style={[styles.settingsSection, darkMode && { backgroundColor: '#111827' }]}>
+            <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Configurações</Text>
+            
+            <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="notifications-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+                <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Notificações</Text>
+              </View>
+              <Switch
+                value={notifications}
+                onValueChange={handleToggleNotifications}
+                trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
+                thumbColor={notifications ? '#8B5CF6' : '#9CA3AF'}
+              />
+            </View>
+
+            <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="moon-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+                <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Modo Escuro</Text>
+              </View>
+              <Switch
+                value={darkMode}
+                onValueChange={(val) => { setDarkMode(val); toggleTheme(); }}
+                trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
+                thumbColor={darkMode ? '#8B5CF6' : '#9CA3AF'}
+              />
+            </View>
+
+            <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="location-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+                <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Serviços de Localização</Text>
+              </View>
+              <Switch
+                value={locationServices}
+                onValueChange={handleToggleLocation}
+                trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
+                thumbColor={locationServices ? '#8B5CF6' : '#9CA3AF'}
+              />
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+
+          {/* Ações */}
+          <View style={[styles.actionsSection, darkMode && { backgroundColor: '#111827' }]}>
+            <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Ações</Text>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={24} color="#EF4444" />
+              <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Sair da Conta</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => setShowDeleteModal(true)}
+            >
+              <Ionicons name="trash-outline" size={24} color="#EF4444" />
+              <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Excluir Conta</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* Modal de Edição */}
+        <Modal
+          visible={showEditModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+        >
+          <SafeAreaView style={styles.modalSafeArea}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  onPress={() => setShowEditModal(false)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Editar Perfil</Text>
+                <TouchableOpacity 
+                  onPress={handleSaveProfile} 
+                  disabled={saving}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={[styles.modalSaveText, saving && { opacity: 0.5 }]}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView 
+                style={styles.modalContent}
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Nome</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="Digite seu nome"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Email</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={editEmail}
+                    onChangeText={setEditEmail}
+                    placeholder="Digite seu email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Foto de Perfil</Text>
+                  {!!editPhoto && (
+                    <Image source={{ uri: editPhoto }} style={styles.previewImage} />
+                  )}
+                  <TouchableOpacity style={[styles.editButton, styles.imagePickerButton]} onPress={handlePickImage}>
+                    <Ionicons name="image-outline" size={16} color="#8B5CF6" />
+                    <Text style={styles.editButtonText}>Selecionar da Galeria</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Modal de Confirmação de Exclusão */}
+        <Modal
+          visible={showDeleteModal}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.deleteModalOverlay}>
+            <View style={styles.deleteModalContent}>
+              <Ionicons name="warning" size={48} color="#EF4444" />
+              <Text style={styles.deleteModalTitle}>Excluir Conta</Text>
+              <Text style={styles.deleteModalText}>
+                Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.
+              </Text>
+              <View style={styles.deleteModalButtons}>
+                <TouchableOpacity 
+                  style={styles.deleteModalCancel}
+                  onPress={() => setShowDeleteModal(false)}
+                >
+                  <Text style={styles.deleteModalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.deleteModalConfirm}
+                  onPress={handleDeleteAccount}
+                  disabled={saving}
+                >
+                  <Text style={styles.deleteModalConfirmText}>
+                    {saving ? 'Excluindo...' : 'Excluir'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -460,7 +493,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 10,
@@ -472,13 +504,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   backButton: {
     padding: 8,
+    zIndex: 10,
   },
   headerTitle: {
     fontSize: 20,
@@ -488,15 +521,21 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 30,
+  },
   profileSection: {
     backgroundColor: 'white',
     alignItems: 'center',
-    paddingVertical: 30,
-    marginBottom: 20,
+    paddingVertical: 24,
+    marginBottom: 16,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   avatar: {
     width: 100,
@@ -528,12 +567,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   userEmail: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   editButton: {
     flexDirection: 'row',
@@ -553,7 +592,7 @@ const styles = StyleSheet.create({
   },
   settingsSection: {
     backgroundColor: 'white',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -576,15 +615,17 @@ const styles = StyleSheet.create({
   settingInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   settingLabel: {
     marginLeft: 15,
     fontSize: 16,
     color: '#333',
+    flex: 1,
   },
   actionsSection: {
     backgroundColor: 'white',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   actionButton: {
     flexDirection: 'row',
@@ -602,6 +643,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: 'white',
@@ -611,7 +656,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
@@ -631,7 +676,10 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
+  },
+  modalScrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   inputGroup: {
     marginBottom: 20,
@@ -651,17 +699,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  previewImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 10,
+    alignSelf: 'center',
+  },
+  imagePickerButton: {
+    marginTop: 10,
+    alignSelf: 'center',
+  },
   deleteModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   deleteModalContent: {
     backgroundColor: 'white',
     borderRadius: 15,
     padding: 30,
-    marginHorizontal: 20,
+    width: '100%',
+    maxWidth: 400,
     alignItems: 'center',
   },
   deleteModalTitle: {
