@@ -24,7 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 const ProfileSettingsScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
-  const { theme, colors, toggleTheme } = useTheme();
+  const { isDarkMode, colors, toggleTheme } = useTheme();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,7 +36,6 @@ const ProfileSettingsScreen = ({ navigation }) => {
   const [editPhoto, setEditPhoto] = useState('');
   
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
 
   useEffect(() => {
@@ -54,7 +53,6 @@ const ProfileSettingsScreen = ({ navigation }) => {
           setEditEmail(userProfile.email || '');
           setEditPhoto(userProfile.fotoPerfil || '');
           if (typeof userProfile.notifications === 'boolean') setNotifications(userProfile.notifications);
-          if (typeof userProfile.darkMode === 'boolean') setDarkMode(userProfile.darkMode);
           if (typeof userProfile.locationServices === 'boolean') setLocationServices(userProfile.locationServices);
         }
       }
@@ -75,7 +73,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
         email: editEmail,
         fotoPerfil: editPhoto,
         notifications,
-        darkMode,
+        darkMode: isDarkMode,
         locationServices,
       };
 
@@ -245,28 +243,30 @@ const ProfileSettingsScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Carregando perfil...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Carregando perfil...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, darkMode && { backgroundColor: '#0F172A' }]}>
-      <View style={[styles.container, darkMode && { backgroundColor: '#0F172A' }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header fixo */}
-        <View style={[styles.header, darkMode && { backgroundColor: '#111827', borderBottomColor: '#1F2937' }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="arrow-back" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, darkMode && { color: 'white' }]}>Configurações</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Configurações</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -276,17 +276,17 @@ const ProfileSettingsScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           {/* Perfil do usuário */}
-          <View style={[styles.profileSection, darkMode && { backgroundColor: '#111827' }]}>
+          <View style={[styles.profileSection, { backgroundColor: colors.card }]}>
             <View style={styles.avatarContainer}>
               {profile?.fotoPerfil ? (
                 <Image source={{ uri: profile.fotoPerfil }} style={styles.avatar} />
               ) : (
-                <View style={[styles.avatarPlaceholder, darkMode && { backgroundColor: '#1F2937', borderColor: '#374151' }]}>
-                  <Ionicons name="person" size={40} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
+                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.separator, borderColor: colors.border }]}>
+                  <Ionicons name="person" size={40} color={colors.primary} />
                 </View>
               )}
               <TouchableOpacity 
-                style={styles.editAvatarButton}
+                style={[styles.editAvatarButton, { backgroundColor: colors.primary }]}
                 onPress={handlePickImage}
                 hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
               >
@@ -294,80 +294,88 @@ const ProfileSettingsScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
             
-            <Text style={[styles.userName, darkMode && { color: 'white' }]}>{profile?.nome || 'Usuário'}</Text>
-            <Text style={[styles.userEmail, darkMode && { color: '#9CA3AF' }]}>{profile?.email || user?.email}</Text>
+            <Text style={[styles.userName, { color: colors.text }]}>
+              {profile?.nome || 'Usuário'}
+            </Text>
+            <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
+              {profile?.email || user?.email}
+            </Text>
             
             <TouchableOpacity 
-              style={[styles.editButton, darkMode && { backgroundColor: '#111827', borderColor: '#374151' }]}
+              style={[styles.editButton, { backgroundColor: colors.separator, borderColor: colors.border }]}
               onPress={() => setShowEditModal(true)}
             >
-              <Ionicons name="create-outline" size={16} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-              <Text style={[styles.editButtonText, darkMode && { color: '#A78BFA' }]}>Editar Perfil</Text>
+              <Ionicons name="create-outline" size={16} color={colors.primary} />
+              <Text style={[styles.editButtonText, { color: colors.primary }]}>Editar Perfil</Text>
             </TouchableOpacity>
           </View>
 
           {/* Configurações */}
-          <View style={[styles.settingsSection, darkMode && { backgroundColor: '#111827' }]}>
-            <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Configurações</Text>
+          <View style={[styles.settingsSection, { backgroundColor: colors.card }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text, borderBottomColor: colors.border }]}>
+              Configurações
+            </Text>
             
-            <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
+            <View style={[styles.settingItem, { borderBottomColor: colors.separator }]}>
               <View style={styles.settingInfo}>
-                <Ionicons name="notifications-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-                <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Notificações</Text>
+                <Ionicons name="notifications-outline" size={24} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Notificações</Text>
               </View>
               <Switch
                 value={notifications}
                 onValueChange={handleToggleNotifications}
-                trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
-                thumbColor={notifications ? '#8B5CF6' : '#9CA3AF'}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={notifications ? colors.primary : colors.textTertiary}
               />
             </View>
 
-            <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
+            <View style={[styles.settingItem, { borderBottomColor: colors.separator }]}>
               <View style={styles.settingInfo}>
-                <Ionicons name="moon-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-                <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Modo Escuro</Text>
+                <Ionicons name="moon-outline" size={24} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Modo Escuro</Text>
               </View>
               <Switch
-                value={darkMode}
-                onValueChange={(val) => { setDarkMode(val); toggleTheme(); }}
-                trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
-                thumbColor={darkMode ? '#8B5CF6' : '#9CA3AF'}
+                value={isDarkMode}
+                onValueChange={toggleTheme}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={isDarkMode ? colors.primary : colors.textTertiary}
               />
             </View>
 
-            <View style={[styles.settingItem, darkMode && { borderBottomColor: '#1F2937' }]}>
+            <View style={[styles.settingItem, { borderBottomColor: colors.separator }]}>
               <View style={styles.settingInfo}>
-                <Ionicons name="location-outline" size={24} color={darkMode ? '#A78BFA' : '#8B5CF6'} />
-                <Text style={[styles.settingLabel, darkMode && { color: 'white' }]}>Serviços de Localização</Text>
+                <Ionicons name="location-outline" size={24} color={colors.primary} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Serviços de Localização</Text>
               </View>
               <Switch
                 value={locationServices}
                 onValueChange={handleToggleLocation}
-                trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
-                thumbColor={locationServices ? '#8B5CF6' : '#9CA3AF'}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={locationServices ? colors.primary : colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Ações */}
-          <View style={[styles.actionsSection, darkMode && { backgroundColor: '#111827' }]}>
-            <Text style={[styles.sectionTitle, darkMode && { color: 'white', borderBottomColor: '#1F2937' }]}>Ações</Text>
+          <View style={[styles.actionsSection, { backgroundColor: colors.card }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text, borderBottomColor: colors.border }]}>
+              Ações
+            </Text>
             
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={handleLogout}
             >
-              <Ionicons name="log-out-outline" size={24} color="#EF4444" />
-              <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Sair da Conta</Text>
+              <Ionicons name="log-out-outline" size={24} color={colors.error} />
+              <Text style={[styles.actionButtonText, { color: colors.error }]}>Sair da Conta</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.actionButton, styles.deleteButton]}
               onPress={() => setShowDeleteModal(true)}
             >
-              <Ionicons name="trash-outline" size={24} color="#EF4444" />
-              <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Excluir Conta</Text>
+              <Ionicons name="trash-outline" size={24} color={colors.error} />
+              <Text style={[styles.actionButtonText, { color: colors.error }]}>Excluir Conta</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -378,22 +386,22 @@ const ProfileSettingsScreen = ({ navigation }) => {
           animationType="slide"
           presentationStyle="pageSheet"
         >
-          <SafeAreaView style={styles.modalSafeArea}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
+          <SafeAreaView style={[styles.modalSafeArea, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+              <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 <TouchableOpacity 
                   onPress={() => setShowEditModal(false)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
                 </TouchableOpacity>
-                <Text style={styles.modalTitle}>Editar Perfil</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Editar Perfil</Text>
                 <TouchableOpacity 
                   onPress={handleSaveProfile} 
                   disabled={saving}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={[styles.modalSaveText, saving && { opacity: 0.5 }]}>
+                  <Text style={[styles.modalSaveText, { color: colors.primary, opacity: saving ? 0.5 : 1 }]}>
                     {saving ? 'Salvando...' : 'Salvar'}
                   </Text>
                 </TouchableOpacity>
@@ -406,35 +414,53 @@ const ProfileSettingsScreen = ({ navigation }) => {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Nome</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Nome</Text>
                   <TextInput
-                    style={styles.modalInput}
+                    style={[styles.modalInput, { 
+                      backgroundColor: colors.inputBackground, 
+                      borderColor: colors.inputBorder,
+                      color: colors.text 
+                    }]}
                     value={editName}
                     onChangeText={setEditName}
                     placeholder="Digite seu nome"
+                    placeholderTextColor={colors.inputPlaceholder}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Email</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
                   <TextInput
-                    style={styles.modalInput}
+                    style={[styles.modalInput, { 
+                      backgroundColor: colors.inputBackground, 
+                      borderColor: colors.inputBorder,
+                      color: colors.text 
+                    }]}
                     value={editEmail}
                     onChangeText={setEditEmail}
                     placeholder="Digite seu email"
+                    placeholderTextColor={colors.inputPlaceholder}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Foto de Perfil</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Foto de Perfil</Text>
                   {!!editPhoto && (
                     <Image source={{ uri: editPhoto }} style={styles.previewImage} />
                   )}
-                  <TouchableOpacity style={[styles.editButton, styles.imagePickerButton]} onPress={handlePickImage}>
-                    <Ionicons name="image-outline" size={16} color="#8B5CF6" />
-                    <Text style={styles.editButtonText}>Selecionar da Galeria</Text>
+                  <TouchableOpacity 
+                    style={[styles.editButton, styles.imagePickerButton, { 
+                      backgroundColor: colors.separator, 
+                      borderColor: colors.border 
+                    }]} 
+                    onPress={handlePickImage}
+                  >
+                    <Ionicons name="image-outline" size={16} color={colors.primary} />
+                    <Text style={[styles.editButtonText, { color: colors.primary }]}>
+                      Selecionar da Galeria
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -448,22 +474,24 @@ const ProfileSettingsScreen = ({ navigation }) => {
           transparent
           animationType="fade"
         >
-          <View style={styles.deleteModalOverlay}>
-            <View style={styles.deleteModalContent}>
-              <Ionicons name="warning" size={48} color="#EF4444" />
-              <Text style={styles.deleteModalTitle}>Excluir Conta</Text>
-              <Text style={styles.deleteModalText}>
+          <View style={[styles.deleteModalOverlay, { backgroundColor: colors.overlay }]}>
+            <View style={[styles.deleteModalContent, { backgroundColor: colors.card }]}>
+              <Ionicons name="warning" size={48} color={colors.error} />
+              <Text style={[styles.deleteModalTitle, { color: colors.text }]}>Excluir Conta</Text>
+              <Text style={[styles.deleteModalText, { color: colors.textSecondary }]}>
                 Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.
               </Text>
               <View style={styles.deleteModalButtons}>
                 <TouchableOpacity 
-                  style={styles.deleteModalCancel}
+                  style={[styles.deleteModalCancel, { backgroundColor: colors.separator }]}
                   onPress={() => setShowDeleteModal(false)}
                 >
-                  <Text style={styles.deleteModalCancelText}>Cancelar</Text>
+                  <Text style={[styles.deleteModalCancelText, { color: colors.textSecondary }]}>
+                    Cancelar
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={styles.deleteModalConfirm}
+                  style={[styles.deleteModalConfirm, { backgroundColor: colors.error }]}
                   onPress={handleDeleteAccount}
                   disabled={saving}
                 >
@@ -483,11 +511,9 @@ const ProfileSettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
@@ -497,7 +523,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
   },
   header: {
     flexDirection: 'row',
@@ -505,9 +530,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   backButton: {
     padding: 8,
@@ -516,7 +539,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
   },
   placeholder: {
     width: 40,
@@ -528,7 +550,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   profileSection: {
-    backgroundColor: 'white',
     alignItems: 'center',
     paddingVertical: 24,
     marginBottom: 16,
@@ -546,17 +567,14 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
   },
   editAvatarButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#8B5CF6',
     borderRadius: 15,
     width: 30,
     height: 30,
@@ -566,42 +584,34 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 16,
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   editButtonText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#8B5CF6',
     fontWeight: '600',
   },
   settingsSection: {
-    backgroundColor: 'white',
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   settingItem: {
     flexDirection: 'row',
@@ -610,7 +620,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   settingInfo: {
     flexDirection: 'row',
@@ -620,11 +629,9 @@ const styles = StyleSheet.create({
   settingLabel: {
     marginLeft: 15,
     fontSize: 16,
-    color: '#333',
     flex: 1,
   },
   actionsSection: {
-    backgroundColor: 'white',
     marginBottom: 16,
   },
   actionButton: {
@@ -633,7 +640,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: 'transparent',
   },
   deleteButton: {
     borderBottomWidth: 0,
@@ -645,11 +652,9 @@ const styles = StyleSheet.create({
   },
   modalSafeArea: {
     flex: 1,
-    backgroundColor: 'white',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'white',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -658,20 +663,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   modalCancelText: {
     fontSize: 16,
-    color: '#666',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   modalSaveText: {
     fontSize: 16,
-    color: '#8B5CF6',
     fontWeight: '600',
   },
   modalContent: {
@@ -687,17 +688,14 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 8,
   },
   modalInput: {
-    backgroundColor: '#F9FAFB',
     borderRadius: 10,
     paddingHorizontal: 15,
     paddingVertical: 12,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   previewImage: {
     width: 120,
@@ -712,13 +710,11 @@ const styles = StyleSheet.create({
   },
   deleteModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   deleteModalContent: {
-    backgroundColor: 'white',
     borderRadius: 15,
     padding: 30,
     width: '100%',
@@ -728,13 +724,11 @@ const styles = StyleSheet.create({
   deleteModalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 15,
     marginBottom: 10,
   },
   deleteModalText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 25,
@@ -745,7 +739,6 @@ const styles = StyleSheet.create({
   },
   deleteModalCancel: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
     paddingVertical: 12,
     borderRadius: 10,
     marginRight: 10,
@@ -753,12 +746,10 @@ const styles = StyleSheet.create({
   },
   deleteModalCancelText: {
     fontSize: 16,
-    color: '#666',
     fontWeight: '600',
   },
   deleteModalConfirm: {
     flex: 1,
-    backgroundColor: '#EF4444',
     paddingVertical: 12,
     borderRadius: 10,
     marginLeft: 10,

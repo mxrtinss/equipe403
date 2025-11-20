@@ -258,12 +258,14 @@ const NearbyEventsScreen = ({ navigation, route }) => {
     }
   };
 
+  const styles = createStyles(colors, theme);
+
   const header = (
-    <View style={[styles.header, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}> 
+    <View style={styles.header}> 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="arrow-back" size={24} color={colors.primary} />
       </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: '#1f2937' }]}>Eventos próximos</Text>
+      <Text style={styles.headerTitle}>Eventos próximos</Text>
       <View style={styles.headerRight}>
         <TouchableOpacity 
           style={styles.mapButton}
@@ -291,11 +293,11 @@ const NearbyEventsScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: '#f9fafb' }]}>
+      <View style={styles.container}>
         {header}
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: '#6b7280' }]}>
+          <Text style={styles.loadingText}>
             {useTicketmaster ? 'Buscando eventos próximos...' : 'Carregando eventos...'}
           </Text>
         </View>
@@ -304,17 +306,17 @@ const NearbyEventsScreen = ({ navigation, route }) => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: '#f9fafb' }]}> 
+    <View style={styles.container}> 
       {header}
       
       {/* Barra de pesquisa */}
-      <View style={[styles.searchContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
-        <View style={[styles.searchBar, { backgroundColor: '#f5f5f5' }]}>
-          <Ionicons name="search" size={20} color="#6b7280" style={styles.searchIcon} />
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
-            style={[styles.searchInput, { color: '#1f2937' }]}
+            style={styles.searchInput}
             placeholder="Buscar eventos, locais, categorias..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCorrect={false}
@@ -322,7 +324,7 @@ const NearbyEventsScreen = ({ navigation, route }) => {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#6b7280" />
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
@@ -330,24 +332,24 @@ const NearbyEventsScreen = ({ navigation, route }) => {
         {/* Botão para mostrar/ocultar filtros */}
         {useTicketmaster && (
           <TouchableOpacity 
-            style={[styles.toggleFiltersButton, { backgroundColor: '#f5f5f5' }]}
+            style={styles.toggleFiltersButton}
             onPress={() => setShowFilters(!showFilters)}
           >
             <Ionicons 
               name={showFilters ? "funnel" : "funnel-outline"} 
               size={18} 
-              color={showFilters ? '#8B5CF6' : '#6b7280'} 
+              color={showFilters ? colors.primary : colors.textSecondary} 
             />
             <Text style={[
               styles.toggleFiltersText, 
-              { color: showFilters ? '#8B5CF6' : '#6b7280' }
+              { color: showFilters ? colors.primary : colors.textSecondary }
             ]}>
               Filtros
             </Text>
             <Ionicons 
               name={showFilters ? "chevron-up" : "chevron-down"} 
               size={16} 
-              color={showFilters ? '#8B5CF6' : '#6b7280'} 
+              color={showFilters ? colors.primary : colors.textSecondary} 
             />
           </TouchableOpacity>
         )}
@@ -355,8 +357,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
 
       {/* Filtro de Categorias */}
       {useTicketmaster && showFilters && (
-        <View style={[styles.categoryContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
-          <Text style={[styles.categoryLabel, { color: '#6b7280' }]}>Categorias:</Text>
+        <View style={styles.categoryContainer}>
+          <Text style={styles.categoryLabel}>Categorias:</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -368,8 +370,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 style={[
                   styles.categoryChip,
                   { 
-                    backgroundColor: selectedCategory === cat.id ? '#8B5CF6' : '#f5f5f5',
-                    borderColor: selectedCategory === cat.id ? '#8B5CF6' : '#e5e5e5',
+                    backgroundColor: selectedCategory === cat.id ? colors.primary : colors.inputBackground,
+                    borderColor: selectedCategory === cat.id ? colors.primary : colors.border,
                   }
                 ]}
                 onPress={() => setSelectedCategory(cat.id)}
@@ -377,11 +379,11 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 <Ionicons 
                   name={cat.icon} 
                   size={16} 
-                  color={selectedCategory === cat.id ? 'white' : '#6b7280'} 
+                  color={selectedCategory === cat.id ? 'white' : colors.textSecondary} 
                 />
                 <Text style={[
                   styles.categoryChipText,
-                  { color: selectedCategory === cat.id ? 'white' : '#1f2937' }
+                  { color: selectedCategory === cat.id ? 'white' : colors.text }
                 ]}>
                   {cat.name}
                 </Text>
@@ -392,8 +394,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
       )}
 
       {useTicketmaster && showFilters && (
-        <View style={[styles.filterContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
-          <Text style={[styles.filterLabel, { color: '#6b7280' }]}>Raio de busca:</Text>
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterLabel}>Raio de busca:</Text>
           <View style={styles.radiusButtons}>
             {[10, 25, 50, 100].map((r) => (
               <TouchableOpacity
@@ -414,7 +416,7 @@ const NearbyEventsScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={[styles.resultCount, { color: '#6b7280' }]}>
+          <Text style={styles.resultCount}>
             {searchQuery || selectedCategory !== 'all' 
               ? `${filteredEvents.length} resultado(s) encontrado(s)` 
               : `${events.length} evento(s) encontrado(s)`}
@@ -445,7 +447,6 @@ const NearbyEventsScreen = ({ navigation, route }) => {
           return (
             <View style={[
               styles.card, 
-              { backgroundColor: 'white', borderColor: '#e5e5e5' },
               isHighlighted && styles.highlightedCard
             ]}> 
               {item.image ? (
@@ -455,8 +456,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                   resizeMode="cover"
                 />
               ) : (
-                <View style={[styles.placeholderImage, { backgroundColor: '#f3f4f6' }]}>
-                  <Ionicons name="calendar-outline" size={48} color="#9ca3af" />
+                <View style={styles.placeholderImage}>
+                  <Ionicons name="calendar-outline" size={48} color={colors.textTertiary} />
                 </View>
               )}
 
@@ -481,14 +482,14 @@ const NearbyEventsScreen = ({ navigation, route }) => {
               </TouchableOpacity>
 
               <View style={styles.cardBody}>
-                <Text style={[styles.cardTitle, { color: '#1f2937' }]}>
+                <Text style={styles.cardTitle}>
                   {item.title || item.name}
                 </Text>
                 
                 {item.date && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
-                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                    <Text style={styles.cardSub}>
                       {item.date}
                     </Text>
                   </View>
@@ -496,8 +497,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 
                 {item.venueName && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="location-outline" size={16} color="#6b7280" />
-                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
+                    <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+                    <Text style={styles.cardSub}>
                       {item.venueName}
                     </Text>
                   </View>
@@ -505,8 +506,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 
                 {item.address && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="navigate-circle-outline" size={16} color="#6b7280" />
-                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]} numberOfLines={1}>
+                    <Ionicons name="navigate-circle-outline" size={16} color={colors.textSecondary} />
+                    <Text style={styles.cardSub} numberOfLines={1}>
                       {item.address}
                     </Text>
                   </View>
@@ -514,8 +515,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 
                 {item.city && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="business-outline" size={16} color="#6b7280" />
-                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
+                    <Ionicons name="business-outline" size={16} color={colors.textSecondary} />
+                    <Text style={styles.cardSub}>
                       {item.city}{item.state ? ` - ${item.state}` : ''}
                     </Text>
                   </View>
@@ -524,7 +525,7 @@ const NearbyEventsScreen = ({ navigation, route }) => {
                 {dist != null && (
                   <View style={styles.infoRow}>
                     <Ionicons name="navigate-outline" size={16} color={colors.primary} />
-                    <Text style={[styles.cardSub, { color: colors.primary, marginLeft: 6, fontWeight: '600' }]}>
+                    <Text style={[styles.cardSub, { color: colors.primary, fontWeight: '600' }]}>
                       {dist.toFixed(1)} km de distância
                     </Text>
                   </View>
@@ -532,15 +533,15 @@ const NearbyEventsScreen = ({ navigation, route }) => {
 
                 {item.priceRange && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="pricetag-outline" size={16} color="#6b7280" />
-                    <Text style={[styles.cardSub, { color: '#6b7280', marginLeft: 6 }]}>
+                    <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                    <Text style={styles.cardSub}>
                       R$ {item.priceRange.min} - R$ {item.priceRange.max}
                     </Text>
                   </View>
                 )}
 
                 <TouchableOpacity 
-                  style={[styles.detailsButton, { backgroundColor: colors.primary }]} 
+                  style={styles.detailsButton} 
                   onPress={() => handleOpenUrl(item.url, item.title)}
                 >
                   <Text style={styles.detailsButtonText}>
@@ -554,8 +555,8 @@ const NearbyEventsScreen = ({ navigation, route }) => {
         }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name={searchQuery ? "search" : "calendar-outline"} size={64} color="#9ca3af" />
-            <Text style={[styles.emptyText, { color: '#6b7280' }]}>
+            <Ionicons name={searchQuery ? "search" : "calendar-outline"} size={64} color={colors.textTertiary} />
+            <Text style={styles.emptyText}>
               {searchQuery 
                 ? `Nenhum evento encontrado para "${searchQuery}".\nTente buscar por outro termo.`
                 : selectedCategory !== 'all'
@@ -566,7 +567,7 @@ const NearbyEventsScreen = ({ navigation, route }) => {
             </Text>
             {useTicketmaster && events.length === 0 && !searchQuery && (
               <TouchableOpacity 
-                style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                style={styles.retryButton}
                 onPress={fetchEvents}
               >
                 <Ionicons name="refresh-outline" size={20} color="white" />
@@ -580,15 +581,20 @@ const NearbyEventsScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+const createStyles = (colors, theme) => StyleSheet.create({
+  container: { 
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 
     paddingHorizontal: 20, 
     paddingVertical: 45, 
-    borderBottomWidth: 1 
+    borderBottomWidth: 1,
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
   },
   backButton: { padding: 8 },
   headerRight: { 
@@ -598,12 +604,22 @@ const styles = StyleSheet.create({
   },
   mapButton: { padding: 8 },
   switchButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold',
+    color: colors.text,
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 14 },
+  loadingText: { 
+    marginTop: 12, 
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
   searchContainer: {
     padding: 16,
     borderBottomWidth: 1,
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
   },
   searchBar: {
     flexDirection: 'row',
@@ -611,6 +627,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 48,
+    backgroundColor: colors.inputBackground,
   },
   searchIcon: {
     marginRight: 8,
@@ -619,6 +636,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     padding: 0,
+    color: colors.text,
   },
   clearButton: {
     padding: 4,
@@ -632,6 +650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     gap: 6,
+    backgroundColor: colors.inputBackground,
   },
   toggleFiltersText: {
     fontSize: 14,
@@ -640,12 +659,15 @@ const styles = StyleSheet.create({
   categoryContainer: {
     paddingVertical: 12,
     borderBottomWidth: 1,
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
   },
   categoryLabel: {
     fontSize: 14,
     fontWeight: '600',
     paddingHorizontal: 16,
     marginBottom: 8,
+    color: colors.textSecondary,
   },
   categoryScroll: {
     paddingHorizontal: 16,
@@ -668,11 +690,14 @@ const styles = StyleSheet.create({
   filterContainer: {
     padding: 16,
     borderBottomWidth: 1,
+    backgroundColor: colors.card,
+    borderBottomColor: colors.border,
   },
   filterLabel: {
     fontSize: 14,
     marginBottom: 8,
     fontWeight: '600',
+    color: colors.textSecondary,
   },
   radiusButtons: {
     flexDirection: 'row',
@@ -694,22 +719,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
     fontWeight: '600',
+    color: colors.textSecondary,
   },
   card: { 
     borderWidth: 1, 
     borderRadius: 12, 
     marginBottom: 12, 
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
   },
   highlightedCard: {
     borderWidth: 3,
-    borderColor: '#8B5CF6',
-    shadowColor: '#8B5CF6',
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
@@ -720,7 +748,7 @@ const styles = StyleSheet.create({
     right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -753,16 +781,20 @@ const styles = StyleSheet.create({
     height: 180,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.separator,
   },
   cardBody: { padding: 12 },
   cardTitle: { 
     fontSize: 18, 
     fontWeight: '700', 
-    marginBottom: 8 
+    marginBottom: 8,
+    color: colors.text,
   },
   cardSub: { 
     fontSize: 14,
     flex: 1,
+    marginLeft: 6,
+    color: colors.textSecondary,
   },
   infoRow: {
     flexDirection: 'row',
@@ -777,6 +809,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
+    backgroundColor: colors.primary,
   },
   detailsButtonText: {
     color: 'white',
@@ -795,6 +828,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     lineHeight: 24,
+    color: colors.textSecondary,
   },
   retryButton: {
     flexDirection: 'row',
@@ -803,6 +837,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
+    backgroundColor: colors.primary,
   },
   retryButtonText: {
     color: 'white',
