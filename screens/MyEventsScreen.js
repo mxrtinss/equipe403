@@ -8,10 +8,16 @@ import { useTheme } from '@react-navigation/native';
 const formatDateTime = (item) => {
   if (item.createdAt) {
     const d = new Date(item.createdAt);
-    return d.toLocaleString();
+    return d.toLocaleString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
   if (item.date || item.time) {
-    return [item.date, item.time].filter(Boolean).join(' ');
+    return [item.date, item.time].filter(Boolean).join(' às ');
   }
   return '';
 };
@@ -29,7 +35,18 @@ const MyEventsScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [addresses, setAddresses] = useState({});
-  const [activeTab, setActiveTab] = useState('created'); // 'created' ou 'favorites'
+  const [activeTab, setActiveTab] = useState('created');
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Recarrega quando a tela fica em foco
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (user?.uid) {
+        loadEvents();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, user?.uid, activeTab]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -37,24 +54,33 @@ const MyEventsScreen = ({ navigation }) => {
   }, [user?.uid, activeTab]);
 
   const loadEvents = async () => {
-    if (activeTab === 'created') {
-      const list = await getUserEventsDb(user.uid);
-      setEvents(list);
-      const cache = {};
-      await Promise.all(list.map(async (e) => {
-        if (e.latitude && e.longitude) {
-          const key = `${e.latitude},${e.longitude}`;
-          if (!cache[key]) {
-            cache[key] = await reverseGeocode(e.latitude, e.longitude);
+    setRefreshing(true);
+    try {
+      if (activeTab === 'created') {
+        const list = await getUserEventsDb(user.uid);
+        setEvents(list);
+        const cache = {};
+        await Promise.all(list.map(async (e) => {
+          if (e.latitude && e.longitude) {
+            const key = `${e.latitude},${e.longitude}`;
+            if (!cache[key]) {
+              cache[key] = await reverseGeocode(e.latitude, e.longitude);
+            }
           }
-        }
-      }));
-      setAddresses(cache);
-    } else {
-      // Carrega favoritos
-      const favorites = await getUserFavorites(user.uid);
-      setEvents(favorites);
-      setAddresses({}); // Favoritos já vêm com endereço
+        }));
+        setAddresses(cache);
+      } else {
+        // Carrega favoritos
+        const favorites = await getUserFavorites(user.uid);
+        console.log('Favoritos carregados:', favorites);
+        setEvents(favorites);
+        setAddresses({});
+      }
+    } catch (error) {
+      console.error('Erro ao carregar eventos:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os eventos.');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -73,12 +99,15 @@ const MyEventsScreen = ({ navigation }) => {
             try {
               if (isCreated) {
                 await deleteEventDb(item.id, item.image);
+                setEvents((prev) => prev.filter((e) => e.id !== item.id));
               } else {
+                // Para favoritos, usa eventId
                 await removeFavoriteEvent(user.uid, item.eventId);
+                setEvents((prev) => prev.filter((e) => e.eventId !== item.eventId));
               }
-              setEvents((prev) => prev.filter((e) => e.id !== item.id));
               Alert.alert('Sucesso', `Evento ${isCreated ? 'excluído' : 'removido dos favoritos'} com sucesso!`);
-            } catch (_) {
+            } catch (error) {
+              console.error('Erro ao deletar:', error);
               Alert.alert('Erro', `Não foi possível ${isCreated ? 'excluir' : 'remover'} o evento.`);
             }
           }
@@ -103,12 +132,14 @@ const MyEventsScreen = ({ navigation }) => {
           }
         ]
       );
+    } else {
+      Alert.alert('Aviso', 'Link não disponível para este evento.');
     }
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header com setinha */}
+    <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+      {/* Header */}
       <View style={{ 
         flexDirection: 'row', 
         alignItems: 'center', 
@@ -116,22 +147,24 @@ const MyEventsScreen = ({ navigation }) => {
         paddingHorizontal: 20, 
         paddingVertical: 45, 
         borderBottomWidth: 1, 
-        borderBottomColor: colors.border, 
-        backgroundColor: colors.card 
+        borderBottomColor: '#e5e5e5', 
+        backgroundColor: 'white'
       }}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
           <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
         </TouchableOpacity>
-        <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>Meus Eventos</Text>
-        <View style={{ width: 40 }} />
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1f2937' }}>Meus Eventos</Text>
+        <TouchableOpacity onPress={loadEvents} style={{ padding: 8 }}>
+          <Ionicons name="refresh-outline" size={24} color="#8B5CF6" />
+        </TouchableOpacity>
       </View>
 
-      {/* Abas para alternar entre criados e favoritos */}
+      {/* Abas */}
       <View style={{ 
         flexDirection: 'row', 
-        backgroundColor: colors.card, 
+        backgroundColor: 'white', 
         borderBottomWidth: 1, 
-        borderBottomColor: colors.border 
+        borderBottomColor: '#e5e5e5'
       }}>
         <TouchableOpacity
           style={{
@@ -145,7 +178,7 @@ const MyEventsScreen = ({ navigation }) => {
           <Text style={{ 
             textAlign: 'center', 
             fontWeight: activeTab === 'created' ? 'bold' : 'normal',
-            color: activeTab === 'created' ? '#8B5CF6' : colors.text 
+            color: activeTab === 'created' ? '#8B5CF6' : '#6b7280'
           }}>
             Meus Eventos
           </Text>
@@ -163,30 +196,32 @@ const MyEventsScreen = ({ navigation }) => {
           <Text style={{ 
             textAlign: 'center', 
             fontWeight: activeTab === 'favorites' ? 'bold' : 'normal',
-            color: activeTab === 'favorites' ? '#8B5CF6' : colors.text 
+            color: activeTab === 'favorites' ? '#8B5CF6' : '#6b7280'
           }}>
-            Favoritos
+            Favoritos {events.length > 0 && activeTab === 'favorites' ? `(${events.length})` : ''}
           </Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={events}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => activeTab === 'favorites' ? item.eventId : item.id}
         contentContainerStyle={{ padding: 16 }}
+        refreshing={refreshing}
+        onRefresh={loadEvents}
         renderItem={({ item }) => {
           const addrKey = item.latitude && item.longitude ? `${item.latitude},${item.longitude}` : '';
-          const address = addresses[addrKey] || item.place || (item.city ? `${item.city}${item.state ? ', ' + item.state : ''}` : '');
+          const address = addresses[addrKey] || item.address || item.place || (item.city ? `${item.city}${item.state ? ', ' + item.state : ''}` : '');
           const isFavorite = activeTab === 'favorites';
           
           return (
             <View style={{ 
               borderWidth: 1, 
-              borderColor: colors.border, 
+              borderColor: '#e5e5e5', 
               borderRadius: 12, 
               marginBottom: 12, 
               overflow: 'hidden', 
-              backgroundColor: colors.card,
+              backgroundColor: 'white',
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -199,15 +234,15 @@ const MyEventsScreen = ({ navigation }) => {
                 <View style={{ 
                   width: '100%', 
                   height: 180, 
-                  backgroundColor: colors.border, 
+                  backgroundColor: '#f3f4f6', 
                   justifyContent: 'center', 
                   alignItems: 'center' 
                 }}>
-                  <Ionicons name="calendar-outline" size={48} color={colors.text} opacity={0.3} />
+                  <Ionicons name="calendar-outline" size={48} color="#9ca3af" />
                 </View>
               )}
 
-              {/* Badge indicando que é favorito */}
+              {/* Badge de favorito */}
               {isFavorite && (
                 <View style={{
                   position: 'absolute',
@@ -227,14 +262,14 @@ const MyEventsScreen = ({ navigation }) => {
               )}
 
               <View style={{ padding: 12 }}>
-                <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 6, color: colors.text }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 6, color: '#1f2937' }}>
                   {item.title}
                 </Text>
                 
                 {formatDateTime(item) && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    <Ionicons name="calendar-outline" size={16} color={colors.text} opacity={0.7} />
-                    <Text style={{ color: colors.text, opacity: 0.7, marginLeft: 6 }}>
+                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                    <Text style={{ color: '#6b7280', marginLeft: 6 }}>
                       {formatDateTime(item)}
                     </Text>
                   </View>
@@ -242,8 +277,8 @@ const MyEventsScreen = ({ navigation }) => {
                 
                 {!!address && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    <Ionicons name="location-outline" size={16} color={colors.text} opacity={0.7} />
-                    <Text style={{ color: colors.text, opacity: 0.7, marginLeft: 6, flex: 1 }} numberOfLines={2}>
+                    <Ionicons name="location-outline" size={16} color="#6b7280" />
+                    <Text style={{ color: '#6b7280', marginLeft: 6, flex: 1 }} numberOfLines={2}>
                       {address}
                     </Text>
                   </View>
@@ -251,8 +286,8 @@ const MyEventsScreen = ({ navigation }) => {
 
                 {isFavorite && item.venueName && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    <Ionicons name="business-outline" size={16} color={colors.text} opacity={0.7} />
-                    <Text style={{ color: colors.text, opacity: 0.7, marginLeft: 6, flex: 1 }} numberOfLines={1}>
+                    <Ionicons name="business-outline" size={16} color="#6b7280" />
+                    <Text style={{ color: '#6b7280', marginLeft: 6, flex: 1 }} numberOfLines={1}>
                       {item.venueName}
                     </Text>
                   </View>
@@ -261,37 +296,37 @@ const MyEventsScreen = ({ navigation }) => {
                 <View style={{ flexDirection: 'row', marginTop: 12, gap: 12 }}>
                   {!isFavorite ? (
                     <>
-                          <TouchableOpacity 
-                    onPress={() => navigation.navigate('CreateEvent', { ...item, id: item.id })}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#8B5CF6',
-                      paddingVertical: 10,
-                      borderRadius: 8,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Ionicons name="create-outline" size={18} color="white" />
-                    <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Editar</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    onPress={() => onDelete(item)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#EF4444',
-                      paddingVertical: 10,
-                      borderRadius: 8,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="white" />
-                    <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Excluir</Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => navigation.navigate('CreateEvent', { ...item, id: item.id })}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#8B5CF6',
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Ionicons name="create-outline" size={18} color="white" />
+                        <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Editar</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        onPress={() => onDelete(item)}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#EF4444',
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={18} color="white" />
+                        <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Excluir</Text>
+                      </TouchableOpacity>
                     </>
                   ) : (
                     <>
@@ -306,9 +341,12 @@ const MyEventsScreen = ({ navigation }) => {
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
+                        disabled={!item.url}
                       >
                         <Ionicons name="open-outline" size={18} color="white" />
-                        <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Abrir</Text>
+                        <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>
+                          {item.url ? 'Abrir' : 'Sem link'}
+                        </Text>
                       </TouchableOpacity>
                       
                       <TouchableOpacity 
@@ -335,8 +373,12 @@ const MyEventsScreen = ({ navigation }) => {
         }}
         ListEmptyComponent={
           <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
-            <Ionicons name={activeTab === 'created' ? "calendar-outline" : "heart-outline"} size={64} color={colors.text} opacity={0.3} />
-            <Text style={{ color: colors.text, textAlign: 'center', marginTop: 16, fontSize: 16 }}>
+            <Ionicons 
+              name={activeTab === 'created' ? "calendar-outline" : "heart-outline"} 
+              size={64} 
+              color="#9ca3af"
+            />
+            <Text style={{ color: '#6b7280', textAlign: 'center', marginTop: 16, fontSize: 16, lineHeight: 24 }}>
               {activeTab === 'created' 
                 ? 'Você ainda não criou eventos.'
                 : 'Você ainda não favoritou eventos.\nFavorite eventos em "Eventos Próximos"!'}
@@ -353,6 +395,20 @@ const MyEventsScreen = ({ navigation }) => {
                 }}
               >
                 <Text style={{ color: 'white', fontWeight: '600' }}>Criar meu primeiro evento</Text>
+              </TouchableOpacity>
+            )}
+            {activeTab === 'favorites' && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('NearbyEvents')}
+                style={{
+                  marginTop: 20,
+                  backgroundColor: '#8B5CF6',
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>Buscar eventos próximos</Text>
               </TouchableOpacity>
             )}
           </View>

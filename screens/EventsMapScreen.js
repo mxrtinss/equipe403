@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Linking, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Linking, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,33 +14,16 @@ const EventsMapScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [coords, setCoords] = useState(null);
   const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
   const [useTicketmaster, setUseTicketmaster] = useState(true);
   const [radius, setRadius] = useState(50);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
-  const [mapKey, setMapKey] = useState(0);
   const webViewRef = useRef(null);
-
-  // Categorias disponíveis
-  const categories = [
-    { id: 'all', name: 'Todos', icon: 'apps' },
-    { id: 'Music', name: 'Música', icon: 'musical-notes' },
-    { id: 'Sports', name: 'Esportes', icon: 'football' },
-    { id: 'Arts & Theatre', name: 'Arte & Teatro', icon: 'color-palette' },
-    { id: 'Film', name: 'Cinema', icon: 'film' },
-    { id: 'Family', name: 'Família', icon: 'people' },
-    { id: 'Miscellaneous', name: 'Outros', icon: 'ellipsis-horizontal' },
-  ];
 
   // Recebe eventos da navegação (opcional)
   useEffect(() => {
     if (route.params?.events && route.params?.coords) {
       const { events: routeEvents, coords: routeCoords, useTicketmaster: routeUseTicketmaster, radius: routeRadius } = route.params;
-      console.log('Eventos recebidos da navegação:', routeEvents.length);
       setEvents(routeEvents);
-      setFilteredEvents(routeEvents);
       setCoords(routeCoords);
       setUseTicketmaster(routeUseTicketmaster || true);
       setRadius(routeRadius || 50);
@@ -69,34 +52,16 @@ const EventsMapScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     if (coords && useTicketmaster && !route.params?.events) {
-      console.log('Buscando eventos com raio:', radius);
       fetchEvents();
     } else if (coords && !useTicketmaster && !route.params?.events) {
       fetchFirebaseEvents();
     }
   }, [coords, radius, useTicketmaster]);
 
-  // Filtrar eventos por categoria
-  useEffect(() => {
-    let filtered = events;
-
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(event => {
-        const eventCategory = event.classifications || '';
-        return eventCategory.toLowerCase().includes(selectedCategory.toLowerCase());
-      });
-    }
-
-    console.log('Eventos após filtro de categoria:', filtered.length);
-    setFilteredEvents(filtered);
-  }, [events, selectedCategory]);
-
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      console.log('Chamando API com raio:', radius, 'km');
       const data = await getNearbyEvents(coords.latitude, coords.longitude, radius);
-      console.log('Eventos retornados da API:', data.length);
       setEvents(data);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível carregar os eventos. Verifique sua conexão e tente novamente.');
@@ -152,20 +117,13 @@ const EventsMapScreen = ({ navigation, route }) => {
 
   const handleRadiusChange = (newRadius) => {
     setRadius(newRadius);
-    setSelectedEvent(null);
-    // Força recarregar o mapa
-    setMapKey(prev => prev + 1);
   };
 
   // Filtra eventos com coordenadas válidas
-  const eventsWithCoords = filteredEvents.filter(
+  const eventsWithCoords = events.filter(
     e => e.latitude != null && e.longitude != null && 
          !isNaN(e.latitude) && !isNaN(e.longitude)
   );
-
-  console.log('Total de eventos:', events.length);
-  console.log('Eventos filtrados:', filteredEvents.length);
-  console.log('Eventos com coordenadas:', eventsWithCoords.length);
 
   // Gera HTML do mapa usando OpenStreetMap com Leaflet (gratuito, sem API key)
   const generateMapHTML = () => {
@@ -279,10 +237,10 @@ const EventsMapScreen = ({ navigation, route }) => {
             const bounds = [[${coords.latitude}, ${coords.longitude}]];
 
             eventMarkers.forEach((markerData) => {
-              // Ícone customizado para eventos (roxo)
+              // Ícone customizado para eventos (vermelho)
               const eventIcon = L.divIcon({
                 className: 'event-marker',
-                html: '<div style="background-color: #8B5CF6; width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><div style="transform: rotate(45deg); color: white; font-weight: bold; text-align: center; line-height: 30px; font-size: 14px;">' + markerData.label + '</div></div>',
+                html: '<div style="background-color: #FF6B6B; width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><div style="transform: rotate(45deg); color: white; font-weight: bold; text-align: center; line-height: 30px; font-size: 14px;">' + markerData.label + '</div></div>',
                 iconSize: [36, 36],
                 iconAnchor: [18, 36],
                 popupAnchor: [0, -36]
@@ -347,11 +305,11 @@ const EventsMapScreen = ({ navigation, route }) => {
   };
 
   const header = (
-    <View style={[styles.header, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}> 
+    <View style={[styles.header, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}> 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color="#8B5CF6" />
+        <Ionicons name="arrow-back" size={24} color={colors.primary} />
       </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: '#333' }]}>Mapa de Eventos</Text>
+      <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mapa de Eventos</Text>
       <TouchableOpacity 
         style={styles.switchButton}
         onPress={() => {
@@ -362,7 +320,7 @@ const EventsMapScreen = ({ navigation, route }) => {
         <Ionicons 
           name={useTicketmaster ? "ticket" : "home"} 
           size={24} 
-          color="#8B5CF6" 
+          color={colors.primary} 
         />
       </TouchableOpacity>
     </View>
@@ -370,11 +328,11 @@ const EventsMapScreen = ({ navigation, route }) => {
 
   if (loading && !coords) {
     return (
-      <View style={[styles.container, { backgroundColor: '#f5f5f5' }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {header}
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={[styles.loadingText, { color: '#666' }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Carregando mapa...
           </Text>
         </View>
@@ -383,72 +341,33 @@ const EventsMapScreen = ({ navigation, route }) => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: '#f5f5f5' }]}> 
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       {header}
-
-      {/* Botão para mostrar/ocultar filtros */}
-      {useTicketmaster && (
-        <View style={[styles.toggleContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
-          <TouchableOpacity 
-            style={[styles.toggleFiltersButton, { backgroundColor: '#f5f5f5' }]}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Ionicons 
-              name={showFilters ? "funnel" : "funnel-outline"} 
-              size={18} 
-              color={showFilters ? '#8B5CF6' : '#666'} 
-            />
-            <Text style={[
-              styles.toggleFiltersText, 
-              { color: showFilters ? '#8B5CF6' : '#666' }
-            ]}>
-              Filtros
-            </Text>
-            <Ionicons 
-              name={showFilters ? "chevron-up" : "chevron-down"} 
-              size={16} 
-              color={showFilters ? '#8B5CF6' : '#666'} 
-            />
-          </TouchableOpacity>
-        </View>
-      )}
       
-      {/* Filtros de Categoria */}
-      {useTicketmaster && showFilters && (
-        <View style={[styles.categoryContainer, { backgroundColor: 'white', borderBottomColor: '#e5e5e5' }]}>
-          <Text style={[styles.categoryLabel, { color: '#666' }]}>Categorias:</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScroll}
-          >
-            {categories.map((cat) => (
+      {useTicketmaster && (
+        <View style={[styles.filterContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
+          <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Raio de busca:</Text>
+          <View style={styles.radiusButtons}>
+            {[10, 25, 50, 100].map((r) => (
               <TouchableOpacity
-                key={cat.id}
+                key={r}
                 style={[
-                  styles.categoryChip,
-                  { 
-                    backgroundColor: selectedCategory === cat.id ? '#8B5CF6' : '#f5f5f5',
-                    borderColor: selectedCategory === cat.id ? '#8B5CF6' : '#e5e5e5',
-                  }
+                  styles.radiusButton, 
+                  { borderColor: colors.primary },
+                  radius === r && { backgroundColor: colors.primary }
                 ]}
-                onPress={() => setSelectedCategory(cat.id)}
+                onPress={() => handleRadiusChange(r)}
               >
-                <Ionicons 
-                  name={cat.icon} 
-                  size={16} 
-                  color={selectedCategory === cat.id ? 'white' : '#666'} 
-                />
                 <Text style={[
-                  styles.categoryChipText,
-                  { color: selectedCategory === cat.id ? 'white' : '#333' }
+                  styles.radiusText, 
+                  { color: radius === r ? 'white' : colors.primary }
                 ]}>
-                  {cat.name}
+                  {r}km
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
-          <Text style={[styles.resultCount, { color: '#666' }]}>
+          </View>
+          <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
             {eventsWithCoords.length} evento(s) no mapa
           </Text>
         </View>
@@ -464,11 +383,10 @@ const EventsMapScreen = ({ navigation, route }) => {
             domStorageEnabled={true}
             startInLoadingState={true}
             onMessage={handleMessage}
-            key={`map-${mapKey}-${selectedCategory}-${radius}-${eventsWithCoords.length}`}
             renderLoading={() => (
               <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
-                <Text style={[styles.loadingText, { color: '#666' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
                   Carregando mapa...
                 </Text>
               </View>
@@ -476,15 +394,13 @@ const EventsMapScreen = ({ navigation, route }) => {
           />
         ) : !loading && coords ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="map-outline" size={64} color="#999" />
-            <Text style={[styles.emptyText, { color: '#666' }]}>
-              {selectedCategory !== 'all' 
-                ? `Nenhum evento de "${categories.find(c => c.id === selectedCategory)?.name}" com localização disponível.`
-                : 'Nenhum evento com localização disponível no mapa.'}
+            <Ionicons name="map-outline" size={64} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Nenhum evento com localização disponível no mapa.
             </Text>
             {useTicketmaster && (
               <TouchableOpacity 
-                style={[styles.retryButton, { backgroundColor: '#8B5CF6' }]}
+                style={[styles.retryButton, { backgroundColor: colors.primary }]}
                 onPress={fetchEvents}
               >
                 <Ionicons name="refresh-outline" size={20} color="white" />
@@ -494,8 +410,8 @@ const EventsMapScreen = ({ navigation, route }) => {
           </View>
         ) : (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
-            <Text style={[styles.loadingText, { color: '#666' }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
               Carregando mapa...
             </Text>
           </View>
@@ -503,22 +419,22 @@ const EventsMapScreen = ({ navigation, route }) => {
 
         {/* Painel de detalhes do evento selecionado */}
         {selectedEvent && (
-          <View style={[styles.detailCard, { backgroundColor: 'white', borderColor: '#e5e5e5' }]}>
+          <View style={[styles.detailCard, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderColor: colors.border }]}>
             <TouchableOpacity 
               style={styles.closeButton}
               onPress={handleCloseDetail}
             >
-              <Ionicons name="close-circle" size={24} color="#999" />
+              <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <Text style={[styles.detailTitle, { color: '#333' }]} numberOfLines={2}>
+            <Text style={[styles.detailTitle, { color: colors.textPrimary }]} numberOfLines={2}>
               {selectedEvent.title || selectedEvent.name}
             </Text>
 
             {selectedEvent.date && (
               <View style={styles.detailRow}>
-                <Ionicons name="calendar-outline" size={16} color="#666" />
-                <Text style={[styles.detailText, { color: '#666', marginLeft: 6 }]}>
+                <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]}>
                   {selectedEvent.date}
                 </Text>
               </View>
@@ -526,8 +442,8 @@ const EventsMapScreen = ({ navigation, route }) => {
 
             {selectedEvent.venueName && (
               <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={[styles.detailText, { color: '#666', marginLeft: 6 }]} numberOfLines={1}>
+                <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>
                   {selectedEvent.venueName}
                 </Text>
               </View>
@@ -535,8 +451,8 @@ const EventsMapScreen = ({ navigation, route }) => {
 
             {selectedEvent.city && (
               <View style={styles.detailRow}>
-                <Ionicons name="business-outline" size={16} color="#666" />
-                <Text style={[styles.detailText, { color: '#666', marginLeft: 6 }]}>
+                <Ionicons name="business-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]}>
                   {selectedEvent.city}{selectedEvent.state ? ` - ${selectedEvent.state}` : ''}
                 </Text>
               </View>
@@ -544,8 +460,8 @@ const EventsMapScreen = ({ navigation, route }) => {
 
             {selectedEvent.distance != null && (
               <View style={styles.detailRow}>
-                <Ionicons name="navigate-outline" size={16} color="#8B5CF6" />
-                <Text style={[styles.detailText, { color: '#8B5CF6', marginLeft: 6, fontWeight: '600' }]}>
+                <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                <Text style={[styles.detailText, { color: colors.primary, marginLeft: 6, fontWeight: '600' }]}>
                   {typeof selectedEvent.distance === 'number' 
                     ? selectedEvent.distance.toFixed(1) 
                     : selectedEvent.distance} km de distância
@@ -555,7 +471,7 @@ const EventsMapScreen = ({ navigation, route }) => {
 
             {selectedEvent.url && (
               <TouchableOpacity 
-                style={[styles.detailsButton, { backgroundColor: '#8B5CF6' }]} 
+                style={[styles.detailsButton, { backgroundColor: colors.primary }]} 
                 onPress={() => handleOpenUrl(selectedEvent.url, selectedEvent.title || selectedEvent.name)}
               >
                 <Text style={styles.detailsButtonText}>
@@ -587,53 +503,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14 },
-  toggleContainer: {
-    padding: 12,
-    borderBottomWidth: 1,
-    zIndex: 1,
-  },
-  toggleFiltersButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 6,
-  },
-  toggleFiltersText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  categoryContainer: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    zIndex: 1,
-  },
-  categoryLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  categoryScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    borderWidth: 1,
-    gap: 6,
-  },
-  categoryChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   filterContainer: {
     padding: 16,
     borderBottomWidth: 1,

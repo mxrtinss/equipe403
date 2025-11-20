@@ -230,10 +230,25 @@ const NearbyEventsScreen = ({ navigation, route }) => {
           newSet.delete(event.id);
           return newSet;
         });
-        Alert.alert('Removido', 'Evento removido dos favoritos!');
       } else {
-        // Adiciona aos favoritos
-        await addFavoriteEvent(user.uid, event);
+        // Adiciona aos favoritos - prepara objeto completo
+        const favoriteEvent = {
+          eventId: event.id, // ID único do evento
+          title: event.title || event.name,
+          image: event.image || null,
+          date: event.date || null,
+          time: event.time || null,
+          venueName: event.venueName || null,
+          address: event.address || null,
+          city: event.city || null,
+          state: event.state || null,
+          url: event.url || null,
+          latitude: event.latitude || null,
+          longitude: event.longitude || null,
+          createdAt: new Date().toISOString(),
+        };
+        
+        await addFavoriteEvent(user.uid, favoriteEvent);
         setFavoriteIds(prev => new Set(prev).add(event.id));
         Alert.alert('Favoritado', 'Evento adicionado aos favoritos!\nVeja em "Meus Eventos".');
       }

@@ -94,33 +94,24 @@ export const getUserProfile = async (uid) => {
   return { id: uid, ...data };
 };
 
+// ============================================
+// FUNÇÕES DE FAVORITOS
+// ============================================
+
 /**
  * Adiciona um evento aos favoritos do usuário
+ * @param {string} uid - ID do usuário
+ * @param {object} eventData - Dados do evento a favoritar
+ * @returns {Promise<string>} - ID do favorito criado
  */
-export const addFavoriteEvent = async (userId, event) => {
+export const addFavoriteEvent = async (uid, eventData) => {
   try {
-    // Cria uma referência única para o favorito
-    const newRef = push(dbRef(rtdb, `favorites/${userId}`));
-    
-    const favoriteData = {
-      eventId: event.id,
-      title: event.title || event.name || '',
-      date: event.date || '',
-      image: event.image || '',
-      url: event.url || '',
-      city: event.city || '',
-      state: event.state || '',
-      venueName: event.venueName || '',
-      latitude: event.latitude || null,
-      longitude: event.longitude || null,
-      priceRange: event.priceRange || null,
-      classifications: event.classifications || '',
-      distance: event.distance || null,
-      createdAt: Date.now(),
-      source: 'ticketmaster',
+    const newRef = push(dbRef(rtdb, `users/${uid}/favorites`));
+    const payload = {
+      ...eventData,
+      favoritedAt: Date.now(),
     };
-    
-    await set(newRef, favoriteData);
+    await set(newRef, payload);
     return newRef.key;
   } catch (error) {
     console.error('Erro ao adicionar favorito:', error);
@@ -129,21 +120,38 @@ export const addFavoriteEvent = async (userId, event) => {
 };
 
 /**
- * Remove um evento dos favoritos
+ * Remove um evento dos favoritos do usuário
+ * @param {string} uid - ID do usuário
+ * @param {string} eventId - ID do evento a remover
+ * @returns {Promise<boolean>}
  */
-export const removeFavoriteEvent = async (userId, eventId) => {
+export const removeFavoriteEvent = async (uid, eventId) => {
   try {
-    const favoritesRef = dbRef(rtdb, `favorites/${userId}`);
-    const q = rtdbQuery(favoritesRef, orderByChild('eventId'), equalTo(eventId));
-    const snap = await get(q);
+    // Busca o favorito pelo eventId
+    const favoritesRef = dbRef(rtdb, `users/${uid}/favorites`);
+    const snap = await get(favoritesRef);
     
-    if (snap.exists()) {
-      const val = snap.val();
-      const deletePromises = Object.keys(val).map(key => 
-        remove(dbRef(rtdb, `favorites/${userId}/${key}`))
-      );
-      await Promise.all(deletePromises);
+    if (!snap.exists()) {
+      return false;
     }
+
+    const favorites = snap.val();
+    let favoriteKey = null;
+
+    // Encontra a chave do favorito que corresponde ao eventId
+    for (const [key, value] of Object.entries(favorites)) {
+      if (value.eventId === eventId) {
+        favoriteKey = key;
+        break;
+      }
+    }
+
+    if (favoriteKey) {
+      await remove(dbRef(rtdb, `users/${uid}/favorites/${favoriteKey}`));
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error('Erro ao remover favorito:', error);
     throw error;
@@ -151,37 +159,59 @@ export const removeFavoriteEvent = async (userId, eventId) => {
 };
 
 /**
- * Verifica se um evento está favoritado
+ * Busca todos os eventos favoritos do usuário
+ * @param {string} uid - ID do usuário
+ * @returns {Promise<Array>} - Array de eventos favoritos
  */
-export const isEventFavorited = async (userId, eventId) => {
+export const getUserFavorites = async (uid) => {
   try {
-    const favoritesRef = dbRef(rtdb, `favorites/${userId}`);
-    const q = rtdbQuery(favoritesRef, orderByChild('eventId'), equalTo(eventId));
-    const snap = await get(q);
-    return snap.exists();
+    const snap = await get(dbRef(rtdb, `users/${uid}/favorites`));
+    
+    if (!snap.exists()) {
+      return [];
+    }
+
+    const favorites = snap.val();
+    const favoritesList = Object.keys(favorites).map((key) => ({
+      id: key,
+      ...favorites[key],
+    }));
+
+    // Ordena por data de favorito (mais recente primeiro)
+    favoritesList.sort((a, b) => (b.favoritedAt || 0) - (a.favoritedAt || 0));
+
+    return favoritesList;
   } catch (error) {
-    console.error('Erro ao verificar favorito:', error);
-    return false;
+    console.error('Erro ao buscar favoritos:', error);
+    return [];
   }
 };
 
 /**
- * Busca todos os eventos favoritos do usuário
+ * Verifica se um evento está nos favoritos do usuário
+ * @param {string} uid - ID do usuário
+ * @param {string} eventId - ID do evento
+ * @returns {Promise<boolean>}
  */
-export const getUserFavorites = async (userId) => {
+export const isEventFavorited = async (uid, eventId) => {
   try {
-    const snap = await get(dbRef(rtdb, `favorites/${userId}`));
+    const snap = await get(dbRef(rtdb, `users/${uid}/favorites`));
     
-    if (!snap.exists()) return [];
+    if (!snap.exists()) {
+      return false;
+    }
+
+    const favorites = snap.val();
     
-    const val = snap.val();
-    return Object.keys(val).map(id => ({
-      id,
-      ...val[id],
-      isFavorite: true,
-    }));
+    for (const value of Object.values(favorites)) {
+      if (value.eventId === eventId) {
+        return true;
+      }
+    }
+
+    return false;
   } catch (error) {
-    console.error('Erro ao buscar favoritos:', error);
-    return [];
+    console.error('Erro ao verificar favorito:', error);
+    return false;
   }
 };
