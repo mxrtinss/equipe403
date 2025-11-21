@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Linking, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Linking, SafeAreaView } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,26 +7,22 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getNearbyEvents, kmDistance } from '../services/eventsApiService';
 import { getEventsNearby as getEventsNearbyDb } from '../services/firebaseConfig';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 const EventsMapScreen = ({ navigation, route }) => {
-  const { colors, theme } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [loading, setLoading] = useState(true);
   const [coords, setCoords] = useState(null);
   const [events, setEvents] = useState([]);
   const [useTicketmaster, setUseTicketmaster] = useState(true);
-  const [radius, setRadius] = useState(50);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const webViewRef = useRef(null);
 
   // Recebe eventos da navegação (opcional)
   useEffect(() => {
     if (route.params?.events && route.params?.coords) {
-      const { events: routeEvents, coords: routeCoords, useTicketmaster: routeUseTicketmaster, radius: routeRadius } = route.params;
+      const { events: routeEvents, coords: routeCoords, useTicketmaster: routeUseTicketmaster } = route.params;
       setEvents(routeEvents);
       setCoords(routeCoords);
       setUseTicketmaster(routeUseTicketmaster || true);
-      setRadius(routeRadius || 50);
       setLoading(false);
     }
   }, [route.params]);
@@ -56,12 +52,12 @@ const EventsMapScreen = ({ navigation, route }) => {
     } else if (coords && !useTicketmaster && !route.params?.events) {
       fetchFirebaseEvents();
     }
-  }, [coords, radius, useTicketmaster]);
+  }, [coords, useTicketmaster]);
 
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const data = await getNearbyEvents(coords.latitude, coords.longitude, radius);
+      const data = await getNearbyEvents(coords.latitude, coords.longitude, 100);
       setEvents(data);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível carregar os eventos. Verifique sua conexão e tente novamente.');
@@ -84,10 +80,6 @@ const EventsMapScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMarkerPress = (event) => {
-    setSelectedEvent(event);
   };
 
   const handleCloseDetail = () => {
@@ -115,17 +107,13 @@ const EventsMapScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleRadiusChange = (newRadius) => {
-    setRadius(newRadius);
-  };
-
   // Filtra eventos com coordenadas válidas
   const eventsWithCoords = events.filter(
     e => e.latitude != null && e.longitude != null && 
          !isNaN(e.latitude) && !isNaN(e.longitude)
   );
 
-  // Gera HTML do mapa usando OpenStreetMap com Leaflet (gratuito, sem API key)
+  // Gera HTML do mapa usando OpenStreetMap com Leaflet
   const generateMapHTML = () => {
     if (!coords || eventsWithCoords.length === 0) {
       return `
@@ -134,7 +122,14 @@ const EventsMapScreen = ({ navigation, route }) => {
           <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-              body { margin: 0; padding: 20px; font-family: Arial, sans-serif; text-align: center; }
+              body { 
+                margin: 0; 
+                padding: 20px; 
+                font-family: Arial, sans-serif; 
+                text-align: center;
+                background-color: ${isDarkMode ? '#0F172A' : '#F9FAFB'};
+                color: ${isDarkMode ? '#F9FAFB' : '#1F2937'};
+              }
             </style>
           </head>
           <body>
@@ -166,7 +161,7 @@ const EventsMapScreen = ({ navigation, route }) => {
           lat: ${event.latitude},
           lng: ${event.longitude},
           title: ${JSON.stringify(event.title || event.name || 'Evento')},
-          label: ${index + 1},
+          image: ${JSON.stringify(event.image || '')},
           info: {
             title: ${JSON.stringify(event.title || event.name || 'Evento')},
             venue: ${JSON.stringify(event.venueName || '')},
@@ -212,19 +207,67 @@ const EventsMapScreen = ({ navigation, route }) => {
             // Inicializa o mapa
             const map = L.map('map').setView([${centerLat}, ${centerLon}], 12);
 
-            // Adiciona tiles do OpenStreetMap (gratuito, sem API key)
+            // Adiciona tiles do OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
               attribution: '© OpenStreetMap contributors',
               maxZoom: 19
             }).addTo(map);
 
-            // Marcador da localização do usuário (azul)
+            // Marcador da localização do usuário (azul com pulso)
             const userIcon = L.divIcon({
               className: 'user-marker',
-              html: '<div style="background-color: #4285F4; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="width: 12px; height: 12px; background-color: white; border-radius: 50%;"></div></div>',
+              html: \`
+                <div style="position: relative;">
+                  <div style="
+                    position: absolute;
+                    width: 40px;
+                    height: 40px;
+                    background-color: rgba(66, 133, 244, 0.3);
+                    border-radius: 50%;
+                    top: -4px;
+                    left: -4px;
+                    animation: pulse 2s infinite;
+                  "></div>
+                  <div style="
+                    background: linear-gradient(135deg, #4285F4 0%, #357AE8 100%);
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                  ">
+                    <div style="
+                      width: 12px;
+                      height: 12px;
+                      background-color: white;
+                      border-radius: 50%;
+                    "></div>
+                  </div>
+                </div>
+                <style>
+                  @keyframes pulse {
+                    0% {
+                      transform: scale(1);
+                      opacity: 1;
+                    }
+                    50% {
+                      transform: scale(1.2);
+                      opacity: 0.6;
+                    }
+                    100% {
+                      transform: scale(1);
+                      opacity: 1;
+                    }
+                  }
+                </style>
+              \`,
               iconSize: [32, 32],
-              iconAnchor: [16, 32],
-              popupAnchor: [0, -32]
+              iconAnchor: [16, 16],
+              popupAnchor: [0, -16]
             });
 
             const userMarker = L.marker([${coords.latitude}, ${coords.longitude}], {
@@ -232,18 +275,70 @@ const EventsMapScreen = ({ navigation, route }) => {
               title: 'Sua localização'
             }).addTo(map);
 
-            // Marcadores dos eventos
+            // Marcadores dos eventos (com imagem do evento)
             const eventMarkers = [${markers}];
             const bounds = [[${coords.latitude}, ${coords.longitude}]];
 
-            eventMarkers.forEach((markerData) => {
-              // Ícone customizado para eventos (vermelho)
+            eventMarkers.forEach((markerData, index) => {
+              // Ícone customizado para eventos (com imagem ou fallback)
               const eventIcon = L.divIcon({
                 className: 'event-marker',
-                html: '<div style="background-color: #FF6B6B; width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><div style="transform: rotate(45deg); color: white; font-weight: bold; text-align: center; line-height: 30px; font-size: 14px;">' + markerData.label + '</div></div>',
-                iconSize: [36, 36],
-                iconAnchor: [18, 36],
-                popupAnchor: [0, -36]
+                html: \`
+                  <div style="
+                    width: 60px;
+                    height: 60px;
+                    border-radius: 12px;
+                    border: 3px solid white;
+                    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);
+                    overflow: hidden;
+                    position: relative;
+                    background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+                  ">
+                    \${markerData.image ? \`
+                      <img 
+                        src="\${markerData.image}" 
+                        style="
+                          width: 100%;
+                          height: 100%;
+                          object-fit: cover;
+                        "
+                        onerror="this.style.display='none'; this.parentElement.innerHTML += '<div style=\\"display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);\\"><svg width=\\"28\\" height=\\"28\\" viewBox=\\"0 0 24 24\\" fill=\\"white\\"><path d=\\"M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z\\"/></svg></div>';"
+                      />
+                    \` : \`
+                      <div style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 100%;
+                        height: 100%;
+                      ">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+                          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>
+                        </svg>
+                      </div>
+                    \`}
+                    <div style="
+                      position: absolute;
+                      bottom: -8px;
+                      right: -8px;
+                      background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+                      color: white;
+                      width: 24px;
+                      height: 24px;
+                      border-radius: 50%;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 12px;
+                      font-weight: bold;
+                      border: 3px solid white;
+                      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                    ">\${index + 1}</div>
+                  </div>
+                \`,
+                iconSize: [60, 60],
+                iconAnchor: [30, 60],
+                popupAnchor: [0, -60]
               });
 
               const marker = L.marker([markerData.lat, markerData.lng], {
@@ -258,7 +353,7 @@ const EventsMapScreen = ({ navigation, route }) => {
                   \${markerData.info.date ? '<p>📅 ' + markerData.info.date + '</p>' : ''}
                   \${markerData.info.venue ? '<p>📍 ' + markerData.info.venue + '</p>' : ''}
                   \${markerData.info.city ? '<p>🏙️ ' + markerData.info.city + (markerData.info.state ? ', ' + markerData.info.state : '') + '</p>' : ''}
-                  \${markerData.info.distance !== 'N/A' ? '<p>📏 ' + markerData.info.distance + ' km</p>' : ''}
+                  \${markerData.info.distance !== 'N/A' ? '<p>📏 ' + markerData.info.distance + ' km de você</p>' : ''}
                 </div>
               \`;
 
@@ -277,7 +372,7 @@ const EventsMapScreen = ({ navigation, route }) => {
             });
 
             // Ajusta o zoom para incluir todos os marcadores
-            map.fitBounds(bounds, { padding: [50, 50] });
+            map.fitBounds(bounds, { padding: [80, 80] });
           </script>
         </body>
       </html>
@@ -304,235 +399,239 @@ const EventsMapScreen = ({ navigation, route }) => {
     }
   };
 
-  const header = (
-    <View style={[styles.header, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}> 
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={24} color={colors.primary} />
-      </TouchableOpacity>
-      <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mapa de Eventos</Text>
-      <TouchableOpacity 
-        style={styles.switchButton}
-        onPress={() => {
-          setUseTicketmaster(!useTicketmaster);
-          setSelectedEvent(null);
-        }}
-      >
-        <Ionicons 
-          name={useTicketmaster ? "ticket" : "home"} 
-          size={24} 
-          color={colors.primary} 
-        />
-      </TouchableOpacity>
-    </View>
-  );
-
   if (loading && !coords) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {header}
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Carregando mapa...
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
-      {header}
-      
-      {useTicketmaster && (
-        <View style={[styles.filterContainer, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderBottomColor: colors.border }]}>
-          <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Raio de busca:</Text>
-          <View style={styles.radiusButtons}>
-            {[10, 25, 50, 100].map((r) => (
-              <TouchableOpacity
-                key={r}
-                style={[
-                  styles.radiusButton, 
-                  { borderColor: colors.primary },
-                  radius === r && { backgroundColor: colors.primary }
-                ]}
-                onPress={() => handleRadiusChange(r)}
-              >
-                <Text style={[
-                  styles.radiusText, 
-                  { color: radius === r ? 'white' : colors.primary }
-                ]}>
-                  {r}km
-                </Text>
-              </TouchableOpacity>
-            ))}
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Mapa de Eventos</Text>
+            <View style={styles.placeholder} />
           </View>
-          <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-            {eventsWithCoords.length} evento(s) no mapa
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.mapContainer}>
-        {coords && eventsWithCoords.length > 0 ? (
-          <WebView
-            ref={webViewRef}
-            source={{ html: generateMapHTML() }}
-            style={styles.map}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            onMessage={handleMessage}
-            renderLoading={() => (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                  Carregando mapa...
-                </Text>
-              </View>
-            )}
-          />
-        ) : !loading && coords ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="map-outline" size={64} color={colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhum evento com localização disponível no mapa.
-            </Text>
-            {useTicketmaster && (
-              <TouchableOpacity 
-                style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                onPress={fetchEvents}
-              >
-                <Ionicons name="refresh-outline" size={20} color="white" />
-                <Text style={styles.retryButtonText}>Tentar novamente</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
               Carregando mapa...
             </Text>
           </View>
-        )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-        {/* Painel de detalhes do evento selecionado */}
-        {selectedEvent && (
-          <View style={[styles.detailCard, { backgroundColor: theme === 'dark' ? colors.card : 'white', borderColor: colors.border }]}>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={handleCloseDetail}
-            >
-              <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}> 
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Mapa de Eventos</Text>
+          <TouchableOpacity 
+            style={styles.switchButton}
+            onPress={() => {
+              setUseTicketmaster(!useTicketmaster);
+              setSelectedEvent(null);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons 
+              name={useTicketmaster ? "ticket" : "home"} 
+              size={24} 
+              color={colors.primary} 
+            />
+          </TouchableOpacity>
+        </View>
 
-            <Text style={[styles.detailTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-              {selectedEvent.title || selectedEvent.name}
+        {/* Info bar */}
+        <View style={[styles.infoBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <View style={styles.infoItem}>
+            <Ionicons name="location" size={16} color={colors.primary} />
+            <Text style={[styles.infoText, { color: colors.text }]}>
+              {eventsWithCoords.length} evento{eventsWithCoords.length !== 1 ? 's' : ''} encontrado{eventsWithCoords.length !== 1 ? 's' : ''}
             </Text>
-
-            {selectedEvent.date && (
-              <View style={styles.detailRow}>
-                <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]}>
-                  {selectedEvent.date}
-                </Text>
-              </View>
-            )}
-
-            {selectedEvent.venueName && (
-              <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>
-                  {selectedEvent.venueName}
-                </Text>
-              </View>
-            )}
-
-            {selectedEvent.city && (
-              <View style={styles.detailRow}>
-                <Ionicons name="business-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]}>
-                  {selectedEvent.city}{selectedEvent.state ? ` - ${selectedEvent.state}` : ''}
-                </Text>
-              </View>
-            )}
-
-            {selectedEvent.distance != null && (
-              <View style={styles.detailRow}>
-                <Ionicons name="navigate-outline" size={16} color={colors.primary} />
-                <Text style={[styles.detailText, { color: colors.primary, marginLeft: 6, fontWeight: '600' }]}>
-                  {typeof selectedEvent.distance === 'number' 
-                    ? selectedEvent.distance.toFixed(1) 
-                    : selectedEvent.distance} km de distância
-                </Text>
-              </View>
-            )}
-
-            {selectedEvent.url && (
-              <TouchableOpacity 
-                style={[styles.detailsButton, { backgroundColor: colors.primary }]} 
-                onPress={() => handleOpenUrl(selectedEvent.url, selectedEvent.title || selectedEvent.name)}
-              >
-                <Text style={styles.detailsButtonText}>
-                  Ver no Ticketmaster
-                </Text>
-                <Ionicons name="open-outline" size={16} color="white" />
-              </TouchableOpacity>
-            )}
           </View>
-        )}
+        </View>
+
+        <View style={styles.mapContainer}>
+          {coords && eventsWithCoords.length > 0 ? (
+            <WebView
+              ref={webViewRef}
+              source={{ html: generateMapHTML() }}
+              style={styles.map}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              onMessage={handleMessage}
+              renderLoading={() => (
+                <View style={[styles.loadingOverlay, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)' }]}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                    Carregando mapa...
+                  </Text>
+                </View>
+              )}
+            />
+          ) : !loading && coords ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="map-outline" size={64} color={colors.textTertiary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Nenhum evento com localização disponível no mapa.
+              </Text>
+              {useTicketmaster && (
+                <TouchableOpacity 
+                  style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                  onPress={fetchEvents}
+                >
+                  <Ionicons name="refresh-outline" size={20} color="white" />
+                  <Text style={styles.retryButtonText}>Tentar novamente</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                Carregando mapa...
+              </Text>
+            </View>
+          )}
+
+          {/* Painel de detalhes do evento selecionado */}
+          {selectedEvent && (
+            <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={handleCloseDetail}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+
+              <Text style={[styles.detailTitle, { color: colors.text }]} numberOfLines={2}>
+                {selectedEvent.title || selectedEvent.name}
+              </Text>
+
+              {selectedEvent.date && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                  <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]}>
+                    {selectedEvent.date}
+                  </Text>
+                </View>
+              )}
+
+              {selectedEvent.venueName && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+                  <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]} numberOfLines={1}>
+                    {selectedEvent.venueName}
+                  </Text>
+                </View>
+              )}
+
+              {selectedEvent.city && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="business-outline" size={16} color={colors.textSecondary} />
+                  <Text style={[styles.detailText, { color: colors.textSecondary, marginLeft: 6 }]}>
+                    {selectedEvent.city}{selectedEvent.state ? ` - ${selectedEvent.state}` : ''}
+                  </Text>
+                </View>
+              )}
+
+              {selectedEvent.distance != null && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                  <Text style={[styles.detailText, { color: colors.primary, marginLeft: 6, fontWeight: '600' }]}>
+                    {typeof selectedEvent.distance === 'number' 
+                      ? selectedEvent.distance.toFixed(1) 
+                      : selectedEvent.distance} km de distância
+                  </Text>
+                </View>
+              )}
+
+              {selectedEvent.url && (
+                <TouchableOpacity 
+                  style={[styles.detailsButton, { backgroundColor: colors.primary }]} 
+                  onPress={() => handleOpenUrl(selectedEvent.url, selectedEvent.title || selectedEvent.name)}
+                >
+                  <Text style={styles.detailsButtonText}>
+                    Ver no Ticketmaster
+                  </Text>
+                  <Ionicons name="open-outline" size={16} color="white" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  safeArea: {
+    flex: 1,
+  },
+  container: { 
+    flex: 1,
+  },
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 
     paddingHorizontal: 20, 
-    paddingVertical: 45, 
+    paddingVertical: 16, 
     borderBottomWidth: 1,
     zIndex: 1,
   },
-  backButton: { padding: 8 },
-  switchButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 14 },
-  filterContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
-    zIndex: 1,
+  backButton: { 
+    padding: 8,
+    zIndex: 10,
   },
-  filterLabel: {
+  switchButton: { 
+    padding: 8,
+  },
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold',
+  },
+  placeholder: {
+    width: 40,
+  },
+  infoBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoText: {
     fontSize: 14,
-    marginBottom: 8,
     fontWeight: '600',
   },
-  radiusButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  radiusButton: {
-    flex: 1,
-    paddingVertical: 8,
-    marginHorizontal: 4,
-    borderRadius: 8,
-    borderWidth: 1,
+  center: { 
+    flex: 1, 
+    justifyContent: 'center', 
     alignItems: 'center',
   },
-  radiusText: {
+  loadingText: { 
+    marginTop: 12, 
     fontSize: 14,
-    fontWeight: '600',
-  },
-  resultCount: {
-    fontSize: 14,
-    marginTop: 12,
-    fontWeight: '600',
   },
   mapContainer: {
     flex: 1,
@@ -548,7 +647,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   detailCard: {
     position: 'absolute',

@@ -265,7 +265,6 @@ const NearbyEventsScreen = ({ navigation, route }) => {
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="arrow-back" size={24} color={colors.primary} />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Eventos próximos</Text>
       <View style={styles.headerRight}>
         <TouchableOpacity 
           style={styles.mapButton}
