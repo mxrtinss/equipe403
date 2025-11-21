@@ -16,7 +16,7 @@ import EventosCard from '../components/EventosCard';
 
 const HomeScreen = ({ navigation }) => {
   const { isLoggedIn, user, loading } = useAuth();
-  const { colors, theme } = useTheme();
+  const { colors, theme, isDarkMode } = useTheme();
   
   const [carouselEvents, setCarouselEvents] = useState([]);
   const [carouselLoading, setCarouselLoading] = useState(true);
@@ -132,11 +132,14 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
-  const styles = createStyles(colors, theme);
+  const styles = createStyles(colors, isDarkMode);
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.scrollViewContainer}>
+    <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollViewContainer}
+        style={{ backgroundColor: colors.background }}
+      >
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -310,7 +313,7 @@ const HomeScreen = ({ navigation }) => {
             )}
           </View>
 
-          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+          <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         </View>
       </ScrollView>
       
@@ -320,7 +323,11 @@ const HomeScreen = ({ navigation }) => {
           style={styles.footerOption}
           onPress={() => navigation.navigate('Home')}
         >
-          <Image source={require('../assets/imagens_rodape/pagina-inicial.png')} style={styles.footerIcon} />
+          <Ionicons 
+            name="home" 
+            size={28} 
+            color={colors.primary}
+          />
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.footerOption}
@@ -334,20 +341,25 @@ const HomeScreen = ({ navigation }) => {
             }
           }}
         >
-          <Image source={require('../assets/imagens_rodape/foto-perfil.png')} style={styles.footerIcon} />
+          <Ionicons 
+            name={isLoggedIn ? "person" : "person-outline"} 
+            size={28} 
+            color={colors.primary}
+          />
         </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-const createStyles = (colors, theme) => StyleSheet.create({
+const createStyles = (colors, isDarkMode) => StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+  },
   scrollViewContainer: {
     paddingBottom: 80,
-    backgroundColor: colors.background,
   },
   container: {
-    backgroundColor: colors.background,
     paddingTop: 40,
     alignItems: 'center',
   },
@@ -367,17 +379,21 @@ const createStyles = (colors, theme) => StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: colors.card,
     borderRadius: 20,
     position: 'absolute',
     zIndex: 1,
     left: 10,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   carouselArrowDisabled: {
-    backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.5)' : 'rgba(200, 200, 200, 0.5)',
-    opacity: 0.5,
+    opacity: 0.4,
   },
   carouselArrowRight: {
     left: undefined,
@@ -411,26 +427,19 @@ const createStyles = (colors, theme) => StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     backgroundColor: colors.card,
-    paddingVertical: 12,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    elevation: 10,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    elevation: 8,
   },
   footerOption: {
     alignItems: 'center',
     flex: 1,
-  },
-  footerIcon: {
-    width: 35,
-    height: 35,
-    marginBottom: 2,
-    tintColor: colors.textSecondary,
+    paddingVertical: 4,
   },
   carouselTitle: {
     fontSize: 20,
