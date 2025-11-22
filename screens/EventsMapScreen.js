@@ -20,6 +20,7 @@ const EventsMapScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (route.params?.events && route.params?.coords) {
       const { events: routeEvents, coords: routeCoords, useTicketmaster: routeUseTicketmaster } = route.params;
+      console.log('📍 Eventos recebidos da navegação:', routeEvents.length);
       setEvents(routeEvents);
       setCoords(routeCoords);
       setUseTicketmaster(routeUseTicketmaster || true);
@@ -54,10 +55,24 @@ const EventsMapScreen = ({ navigation, route }) => {
     }
   }, [coords, useTicketmaster]);
 
+  // Recarrega eventos quando alternar a fonte
+  useEffect(() => {
+    if (coords && !route.params?.events) {
+      if (useTicketmaster) {
+        fetchEvents();
+      } else {
+        fetchFirebaseEvents();
+      }
+    }
+  }, [useTicketmaster]);
+
   const fetchEvents = async () => {
+    if (!coords) return;
     setLoading(true);
     try {
+      console.log('📍 Buscando eventos do Ticketmaster...');
       const data = await getNearbyEvents(coords.latitude, coords.longitude, 100);
+      console.log('📍 Eventos do Ticketmaster carregados:', data.length);
       setEvents(data);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível carregar os eventos. Verifique sua conexão e tente novamente.');
@@ -69,9 +84,12 @@ const EventsMapScreen = ({ navigation, route }) => {
   };
 
   const fetchFirebaseEvents = async () => {
+    if (!coords) return;
     setLoading(true);
     try {
+      console.log('📍 Buscando eventos locais do Firebase...');
       const data = await getEventsNearbyDb(coords.latitude, coords.longitude);
+      console.log('📍 Eventos locais do Firebase carregados:', data.length);
       setEvents(data);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível carregar os eventos do banco de dados.');
@@ -107,11 +125,27 @@ const EventsMapScreen = ({ navigation, route }) => {
     }
   };
 
-  // Filtra eventos com coordenadas válidas
-  const eventsWithCoords = events.filter(
-    e => e.latitude != null && e.longitude != null && 
-         !isNaN(e.latitude) && !isNaN(e.longitude)
-  );
+  // Filtra eventos com coordenadas válidas - MELHORADO
+  const eventsWithCoords = events.filter(e => {
+    const hasLat = e.latitude !== null && e.latitude !== undefined && !isNaN(parseFloat(e.latitude));
+    const hasLon = e.longitude !== null && e.longitude !== undefined && !isNaN(parseFloat(e.longitude));
+    
+    // Log para debug
+    if (!hasLat || !hasLon) {
+      console.log('⚠️ Evento sem coordenadas válidas:', {
+        title: e.title || e.name,
+        lat: e.latitude,
+        lon: e.longitude,
+        hasLat,
+        hasLon
+      });
+    }
+    
+    return hasLat && hasLon;
+  });
+
+  console.log('📍 Total de eventos:', events.length);
+  console.log('📍 Eventos com coordenadas válidas:', eventsWithCoords.length);
 
   // Gera HTML do mapa usando OpenStreetMap com Leaflet
   const generateMapHTML = () => {
@@ -139,9 +173,22 @@ const EventsMapScreen = ({ navigation, route }) => {
       `;
     }
 
+    // Agrupa eventos pela mesma localização
+    const locationGroups = {};
+    eventsWithCoords.forEach(event => {
+      const key = `${parseFloat(event.latitude).toFixed(6)},${parseFloat(event.longitude).toFixed(6)}`;
+      if (!locationGroups[key]) {
+        locationGroups[key] = [];
+      }
+      locationGroups[key].push(event);
+    });
+
+    console.log('📍 Localizações únicas:', Object.keys(locationGroups).length);
+    console.log('📍 Eventos agrupados:', locationGroups);
+
     // Calcula o centro e zoom
-    const latitudes = [...eventsWithCoords.map(e => e.latitude), coords.latitude];
-    const longitudes = [...eventsWithCoords.map(e => e.longitude), coords.longitude];
+    const latitudes = [...eventsWithCoords.map(e => parseFloat(e.latitude)), coords.latitude];
+    const longitudes = [...eventsWithCoords.map(e => parseFloat(e.longitude)), coords.longitude];
     const minLat = Math.min(...latitudes);
     const maxLat = Math.max(...latitudes);
     const minLon = Math.min(...longitudes);
@@ -149,31 +196,52 @@ const EventsMapScreen = ({ navigation, route }) => {
     const centerLat = (minLat + maxLat) / 2;
     const centerLon = (minLon + maxLon) / 2;
 
-    // Cria marcadores para os eventos
-    const markers = eventsWithCoords.map((event, index) => {
-      const dist = event.distance != null ? event.distance.toFixed(1) : 
-                   (event.latitude && event.longitude && coords 
-                    ? kmDistance(coords.latitude, coords.longitude, event.latitude, event.longitude).toFixed(1)
-                    : 'N/A');
+    // Cria marcadores com offset para eventos no mesmo local
+    const markers = [];
+    let globalIndex = 0;
+
+    Object.entries(locationGroups).forEach(([locationKey, events]) => {
+      const [baseLat, baseLon] = locationKey.split(',').map(parseFloat);
       
-      return `
-        {
-          lat: ${event.latitude},
-          lng: ${event.longitude},
-          title: ${JSON.stringify(event.title || event.name || 'Evento')},
-          image: ${JSON.stringify(event.image || '')},
+      events.forEach((event, localIndex) => {
+        // Aplica um pequeno offset se houver múltiplos eventos no mesmo local
+        const offset = events.length > 1 ? 0.0003 : 0; // ~33 metros
+        const angle = (localIndex * (360 / events.length)) * (Math.PI / 180);
+        const eventLat = baseLat + (offset * Math.cos(angle));
+        const eventLon = baseLon + (offset * Math.sin(angle));
+        
+        const dist = event.distance != null ? event.distance.toFixed(1) : 
+                     (coords ? kmDistance(coords.latitude, coords.longitude, baseLat, baseLon).toFixed(1) : 'N/A');
+        
+        const markerObj = {
+          lat: eventLat,
+          lng: eventLon,
+          originalLat: baseLat,
+          originalLon: baseLon,
+          isGrouped: events.length > 1,
+          groupSize: events.length,
+          groupIndex: localIndex,
+          title: event.title || event.name || 'Evento',
+          image: event.image || '',
           info: {
-            title: ${JSON.stringify(event.title || event.name || 'Evento')},
-            venue: ${JSON.stringify(event.venueName || '')},
-            city: ${JSON.stringify(event.city || '')},
-            state: ${JSON.stringify(event.state || '')},
-            date: ${JSON.stringify(event.date || '')},
-            distance: '${dist}',
-            url: ${JSON.stringify(event.url || '')}
+            title: event.title || event.name || 'Evento',
+            venue: event.venueName || '',
+            city: event.city || '',
+            state: event.state || '',
+            date: event.date || '',
+            distance: dist,
+            url: event.url || '',
+            groupInfo: events.length > 1 ? `${localIndex + 1} de ${events.length} eventos neste local` : null
           }
-        }
-      `;
-    }).join(',');
+        };
+
+        markers.push(JSON.stringify(markerObj));
+        globalIndex++;
+      });
+    });
+
+    const markersJson = '[' + markers.join(',') + ']';
+    console.log('🗺️ Gerando mapa com', markers.length, 'marcadores em', Object.keys(locationGroups).length, 'localizações');
 
     return `
       <!DOCTYPE html>
@@ -204,6 +272,8 @@ const EventsMapScreen = ({ navigation, route }) => {
         <body>
           <div id="map"></div>
           <script>
+            console.log('🗺️ Inicializando mapa...');
+            
             // Inicializa o mapa
             const map = L.map('map').setView([${centerLat}, ${centerLon}], 12);
 
@@ -275,104 +345,159 @@ const EventsMapScreen = ({ navigation, route }) => {
               title: 'Sua localização'
             }).addTo(map);
 
-            // Marcadores dos eventos (com imagem do evento)
-            const eventMarkers = [${markers}];
+            // Marcadores dos eventos
+            const eventMarkers = ${markersJson};
+            console.log('🗺️ Total de marcadores:', eventMarkers.length);
+            
             const bounds = [[${coords.latitude}, ${coords.longitude}]];
 
             eventMarkers.forEach((markerData, index) => {
-              // Ícone customizado para eventos (com imagem ou fallback)
-              const eventIcon = L.divIcon({
-                className: 'event-marker',
-                html: \`
-                  <div style="
-                    width: 60px;
-                    height: 60px;
-                    border-radius: 12px;
-                    border: 3px solid white;
-                    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);
-                    overflow: hidden;
-                    position: relative;
-                    background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
-                  ">
-                    \${markerData.image ? \`
-                      <img 
-                        src="\${markerData.image}" 
-                        style="
+              try {
+                console.log('📍 Processando marcador', index + 1, ':', markerData.title, 
+                           markerData.isGrouped ? '(agrupado ' + markerData.groupIndex + ')' : '');
+                
+                // Validação adicional
+                if (!markerData.lat || !markerData.lng || isNaN(markerData.lat) || isNaN(markerData.lng)) {
+                  console.error('❌ Coordenadas inválidas para marcador', index + 1);
+                  return;
+                }
+                
+                // Badge colorido baseado no índice do grupo
+                const badgeColors = [
+                  'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                  'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                  'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                  'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                  'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)'
+                ];
+                const badgeColor = markerData.isGrouped 
+                  ? badgeColors[markerData.groupIndex % badgeColors.length]
+                  : 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)';
+                
+                // Ícone customizado para eventos
+                const eventIcon = L.divIcon({
+                  className: 'event-marker',
+                  html: \`
+                    <div style="
+                      width: 60px;
+                      height: 60px;
+                      border-radius: 12px;
+                      border: 3px solid white;
+                      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);
+                      overflow: hidden;
+                      position: relative;
+                      background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+                    ">
+                      \${markerData.image ? \`
+                        <img 
+                          src="\${markerData.image}" 
+                          style="
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                          "
+                          onerror="this.style.display='none'; this.parentElement.innerHTML += '<div style=\\"display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);\\"><svg width=\\"28\\" height=\\"28\\" viewBox=\\"0 0 24 24\\" fill=\\"white\\"><path d=\\"M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z\\"/></svg></div>';"
+                        />
+                      \` : \`
+                        <div style="
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
                           width: 100%;
                           height: 100%;
-                          object-fit: cover;
-                        "
-                        onerror="this.style.display='none'; this.parentElement.innerHTML += '<div style=\\"display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);\\"><svg width=\\"28\\" height=\\"28\\" viewBox=\\"0 0 24 24\\" fill=\\"white\\"><path d=\\"M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z\\"/></svg></div>';"
-                      />
-                    \` : \`
+                        ">
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+                            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>
+                          </svg>
+                        </div>
+                      \`}
                       <div style="
+                        position: absolute;
+                        bottom: -8px;
+                        right: -8px;
+                        background: \${badgeColor};
+                        color: white;
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        width: 100%;
-                        height: 100%;
-                      ">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-                          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>
-                        </svg>
-                      </div>
-                    \`}
-                    <div style="
-                      position: absolute;
-                      bottom: -8px;
-                      right: -8px;
-                      background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-                      color: white;
-                      width: 24px;
-                      height: 24px;
-                      border-radius: 50%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      font-size: 12px;
-                      font-weight: bold;
-                      border: 3px solid white;
-                      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                    ">\${index + 1}</div>
+                        font-size: 12px;
+                        font-weight: bold;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                      ">\${index + 1}</div>
+                      \${markerData.isGrouped ? \`
+                        <div style="
+                          position: absolute;
+                          top: -8px;
+                          left: -8px;
+                          background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+                          color: white;
+                          width: 20px;
+                          height: 20px;
+                          border-radius: 50%;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-size: 10px;
+                          font-weight: bold;
+                          border: 2px solid white;
+                          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        ">\${markerData.groupSize}</div>
+                      \` : ''}
+                    </div>
+                  \`,
+                  iconSize: [60, 60],
+                  iconAnchor: [30, 60],
+                  popupAnchor: [0, -60]
+                });
+
+                const marker = L.marker([markerData.lat, markerData.lng], {
+                  icon: eventIcon,
+                  title: markerData.title
+                });
+
+                // Conteúdo do popup
+                const popupContent = \`
+                  <div class="custom-popup">
+                    <h3>\${markerData.info.title}</h3>
+                    \${markerData.info.groupInfo ? '<p style="color: #F59E0B; font-weight: bold;">📍 ' + markerData.info.groupInfo + '</p>' : ''}
+                    \${markerData.info.date ? '<p>📅 ' + markerData.info.date + '</p>' : ''}
+                    \${markerData.info.venue ? '<p>📍 ' + markerData.info.venue + '</p>' : ''}
+                    \${markerData.info.city ? '<p>🏙️ ' + markerData.info.city + (markerData.info.state ? ', ' + markerData.info.state : '') + '</p>' : ''}
+                    \${markerData.info.distance !== 'N/A' ? '<p>📏 ' + markerData.info.distance + ' km de você</p>' : ''}
                   </div>
-                \`,
-                iconSize: [60, 60],
-                iconAnchor: [30, 60],
-                popupAnchor: [0, -60]
-              });
+                \`;
 
-              const marker = L.marker([markerData.lat, markerData.lng], {
-                icon: eventIcon,
-                title: markerData.title
-              });
+                marker.bindPopup(popupContent);
+                marker.addTo(map);
+                console.log('✅ Marcador', index + 1, 'adicionado com sucesso!');
 
-              // Conteúdo do popup
-              const popupContent = \`
-                <div class="custom-popup">
-                  <h3>\${markerData.info.title}</h3>
-                  \${markerData.info.date ? '<p>📅 ' + markerData.info.date + '</p>' : ''}
-                  \${markerData.info.venue ? '<p>📍 ' + markerData.info.venue + '</p>' : ''}
-                  \${markerData.info.city ? '<p>🏙️ ' + markerData.info.city + (markerData.info.state ? ', ' + markerData.info.state : '') + '</p>' : ''}
-                  \${markerData.info.distance !== 'N/A' ? '<p>📏 ' + markerData.info.distance + ' km de você</p>' : ''}
-                </div>
-              \`;
+                // Quando o marcador é clicado, envia mensagem para o React Native
+                marker.on('click', function() {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'markerClick',
+                    data: markerData.info
+                  }));
+                });
 
-              marker.bindPopup(popupContent);
-              marker.addTo(map);
-
-              // Quando o marcador é clicado, envia mensagem para o React Native
-              marker.on('click', function() {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'markerClick',
-                  data: markerData.info
-                }));
-              });
-
-              bounds.push([markerData.lat, markerData.lng]);
+                bounds.push([markerData.lat, markerData.lng]);
+              } catch (error) {
+                console.error('❌ Erro ao adicionar marcador', index + 1, ':', error);
+              }
             });
 
+            console.log('🗺️ Todos os marcadores adicionados. Ajustando bounds...');
+            
             // Ajusta o zoom para incluir todos os marcadores
-            map.fitBounds(bounds, { padding: [80, 80] });
+            if (bounds.length > 1) {
+              map.fitBounds(bounds, { padding: [80, 80] });
+            }
+            
+            console.log('✅ Mapa carregado com sucesso!');
           </script>
         </body>
       </html>
@@ -441,8 +566,10 @@ const EventsMapScreen = ({ navigation, route }) => {
           <TouchableOpacity 
             style={styles.switchButton}
             onPress={() => {
+              console.log('🔄 Alternando fonte de eventos:', useTicketmaster ? 'Local' : 'Ticketmaster');
               setUseTicketmaster(!useTicketmaster);
               setSelectedEvent(null);
+              setEvents([]); // Limpa eventos para forçar reload
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -457,11 +584,20 @@ const EventsMapScreen = ({ navigation, route }) => {
         {/* Info bar */}
         <View style={[styles.infoBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <View style={styles.infoItem}>
-            <Ionicons name="location" size={16} color={colors.primary} />
+            <Ionicons 
+              name={useTicketmaster ? "ticket" : "home"} 
+              size={16} 
+              color={colors.primary} 
+            />
             <Text style={[styles.infoText, { color: colors.text }]}>
-              {eventsWithCoords.length} evento{eventsWithCoords.length !== 1 ? 's' : ''} encontrado{eventsWithCoords.length !== 1 ? 's' : ''}
+              {useTicketmaster ? 'Ticketmaster' : 'Eventos Locais'}: {eventsWithCoords.length} evento{eventsWithCoords.length !== 1 ? 's' : ''} no mapa
             </Text>
           </View>
+          {events.length > eventsWithCoords.length && (
+            <Text style={[styles.warningText, { color: colors.warning }]}>
+              ⚠️ {events.length - eventsWithCoords.length} evento(s) sem localização
+            </Text>
+          )}
         </View>
 
         <View style={styles.mapContainer}>
@@ -487,17 +623,17 @@ const EventsMapScreen = ({ navigation, route }) => {
             <View style={styles.emptyContainer}>
               <Ionicons name="map-outline" size={64} color={colors.textTertiary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Nenhum evento com localização disponível no mapa.
+                {useTicketmaster 
+                  ? 'Nenhum evento do Ticketmaster com localização disponível no mapa.'
+                  : 'Nenhum evento local com localização disponível no mapa.'}
               </Text>
-              {useTicketmaster && (
-                <TouchableOpacity 
-                  style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                  onPress={fetchEvents}
-                >
-                  <Ionicons name="refresh-outline" size={20} color="white" />
-                  <Text style={styles.retryButtonText}>Tentar novamente</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                onPress={useTicketmaster ? fetchEvents : fetchFirebaseEvents}
+              >
+                <Ionicons name="refresh-outline" size={20} color="white" />
+                <Text style={styles.retryButtonText}>Tentar novamente</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.center}>
@@ -623,6 +759,11 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  warningText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   center: { 
     flex: 1, 
